@@ -19,7 +19,7 @@ class Database:
                     user_id INTEGER PRIMARY KEY,
                     username TEXT,
                     first_name TEXT,
-                    language TEXT DEFAULT 'en',
+                    language TEXT DEFAULT 'de',
                     timezone TEXT DEFAULT 'UTC',
                     message_frequency INTEGER DEFAULT 2,
                     active BOOLEAN DEFAULT 1,
@@ -89,11 +89,26 @@ class Database:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT OR REPLACE INTO users 
-                    (user_id, username, first_name, last_active) 
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, username, first_name, datetime.now()))
+                
+                # Check if user already exists
+                cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+                user_exists = cursor.fetchone() is not None
+                
+                if user_exists:
+                    # User exists - only update username, first_name, and last_active
+                    cursor.execute("""
+                        UPDATE users 
+                        SET username = ?, first_name = ?, last_active = ?
+                        WHERE user_id = ?
+                    """, (username, first_name, datetime.now(), user_id))
+                else:
+                    # New user - insert with all default values
+                    cursor.execute("""
+                        INSERT INTO users 
+                        (user_id, username, first_name, language, timezone, message_frequency, active, created_at, last_active) 
+                        VALUES (?, ?, ?, 'de', 'UTC', 2, 1, ?, ?)
+                    """, (user_id, username, first_name, datetime.now(), datetime.now()))
+                
                 conn.commit()
                 return True
         except Exception as e:
@@ -247,3 +262,139 @@ class Database:
         except Exception as e:
             logging.error(f"Error getting message stats: {e}")
             return {}
+
+    def reset_user_data(self, user_id: int) -> bool:
+        """Reset all user data to defaults and clear history"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Reset user settings to defaults
+                cursor.execute("""
+                    UPDATE users 
+                    SET language = 'de', 
+                        message_frequency = 2, 
+                        active = 1,
+                        last_active = ?
+                    WHERE user_id = ?
+                """, (datetime.now(), user_id))
+                
+                # Delete all user's mood entries
+                cursor.execute("DELETE FROM mood_entries WHERE user_id = ?", (user_id,))
+                
+                # Delete all user's goals
+                cursor.execute("DELETE FROM user_goals WHERE user_id = ?", (user_id,))
+                
+                # Delete all user's feedback
+                cursor.execute("DELETE FROM feedback WHERE user_id = ?", (user_id,))
+                
+                # Delete all user's sent message history
+                cursor.execute("DELETE FROM sent_messages WHERE user_id = ?", (user_id,))
+                
+                conn.commit()
+                logging.info(f"Reset all data for user {user_id}")
+                return True
+                
+        except Exception as e:
+            logging.error(f"Error resetting user data: {e}")
+            return False
+
+    def get_all_users(self) -> List[int]:
+        """Get list of all user IDs (active and inactive)"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT user_id FROM users")
+                return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            logging.error(f"Error getting all users: {e}")
+            return []
+
+    def get_total_mood_entries(self) -> int:
+        """Get total number of mood entries across all users"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM mood_entries")
+                result = cursor.fetchone()
+                return result[0] if result else 0
+        except Exception as e:
+            logging.error(f"Error getting total mood entries: {e}")
+            return 0
+
+    def get_recently_active_users(self, days: int = 7) -> List[int]:
+        """Get list of users who were active in the last N days"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT user_id FROM users 
+                    WHERE last_active >= datetime('now', '-{} days')
+                """.format(days))
+                return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            logging.error(f"Error getting recently active users: {e}")
+            return []
+
+    def get_all_users_detailed(self) -> List[Dict[str, Any]]:
+        """Get detailed information for all users"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT user_id, username, first_name, language, 
+                           message_frequency, active, last_active, created_at
+                    FROM users 
+                    ORDER BY last_active DESC
+                """)
+                results = cursor.fetchall()
+                
+                users = []
+                for row in results:
+                    users.append({
+                        'user_id': row[0],
+                        'username': row[1],
+                        'first_name': row[2],
+                        'language': row[3],
+                        'message_frequency': row[4],
+                        'active': row[5],
+                        'last_active': row[6],
+                        'created_at': row[7]
+                    })
+                
+                return users
+                
+        except Exception as e:
+            logging.error(f"Error getting detailed user list: {e}")
+            return []
+
+    def get_user_detailed_info(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get detailed information for a specific user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT user_id, username, first_name, language, 
+                           message_frequency, active, last_active, created_at
+                    FROM users 
+                    WHERE user_id = ?
+                """, (user_id,))
+                result = cursor.fetchone()
+                
+                if result:
+                    return {
+                        'user_id': result[0],
+                        'username': result[1],
+                        'first_name': result[2],
+                        'language': result[3],
+                        'message_frequency': result[4],
+                        'active': result[5],
+                        'last_active': result[6],
+                        'created_at': result[7]
+                    }
+                
+                return None
+                
+        except Exception as e:
+            logging.error(f"Error getting detailed user info: {e}")
+            return None

@@ -25,6 +25,13 @@ class MessageScheduler:
             id='hourly_message_check'
         )
         
+        # For testing: also check every 10 minutes (remove in production)
+        self.scheduler.add_job(
+            func=self._check_and_send_messages,
+            trigger=CronTrigger(minute='*/10'),  # Every 10 minutes
+            id='frequent_message_check'
+        )
+        
         # Daily mood reminder (optional)
         self.scheduler.add_job(
             func=self._send_mood_reminders,
@@ -54,9 +61,9 @@ class MessageScheduler:
                 # Add some randomness - make it more likely during "active" hours
                 current_hour = datetime.now().hour
                 if 8 <= current_hour <= 22:  # Daytime hours
-                    hourly_probability *= 1.5
+                    hourly_probability *= 3.0  # Increased from 1.5 to 3.0
                 else:  # Night hours
-                    hourly_probability *= 0.3
+                    hourly_probability *= 0.5  # Increased from 0.3 to 0.5
                 
                 # Random decision
                 if random.random() < hourly_probability:
