@@ -53,12 +53,14 @@ python main.py  # Recreates database
 2. **`bot.py`** - Main bot logic, Telegram handlers, user interactions
 3. **`database.py`** - SQLite operations, user data management, analytics
 4. **`content.py`** - Motivational content management, categorization, multi-language support
-5. **`scheduler.py`** - Random message scheduling, mood reminders
+5. **`smart_scheduler.py`** - Intelligent message scheduling with peak-time optimization, mood-based frequency adjustment
 
 ### Key Design Patterns
 
 **Database Schema**: 
 - `users` - User settings, preferences, activity status
+- `user_timing_preferences` - Smart scheduling settings (active hours, peak times, minimum gaps)
+- `message_schedule_log` - Engagement tracking for learning optimal send times
 - `sent_messages` - Message tracking for analytics
 - `feedback` - User feedback on message effectiveness
 - `mood_entries` - Mood tracking (1-10 scale)
@@ -70,16 +72,19 @@ python main.py  # Recreates database
 - Language-specific content arrays in `content.py`
 - Mood-based content selection algorithm
 
-**Message Scheduling**:
-- Hourly probability calculation based on user frequency settings
-- Random delays within scheduling windows
-- Adaptive timing (higher probability during daytime)
+**Smart Message Scheduling**:
+- Peak-focused distribution (60% during optimal motivation times)
+- Intelligent timing with morning (8-10 AM), afternoon (2-4 PM), evening (6-8 PM) peaks
+- User-configurable active hours and minimum gaps (1-6 hours)
+- Mood-based frequency boost (+50% after low mood, +100% after very low mood)
+- Engagement tracking for learning optimal send times
+- Daily limits to prevent over-messaging
 - Daily mood reminders at 8 PM
 
 ### User Interaction Flow
 
 1. User starts with `/start` → Language selection → Database user creation
-2. Settings configuration via `/settings` → Inline keyboards
+2. Settings configuration via `/settings` → Inline keyboards (language, frequency, timing preferences)
 3. Mood tracking via `/mood` → Triggers personalized content selection
 4. Scheduled messages → Content based on recent mood and user preferences
 5. Feedback collection → Simple emoji reactions logged to database
@@ -126,6 +131,15 @@ new_content = MotivationalContent(
 - `timezone` - User timezone (not fully implemented)
 - `active` - Boolean for pause/resume functionality
 
+### Smart Timing Preferences (Database)
+- `active_start_hour/minute` - When daily messages should begin
+- `active_end_hour/minute` - When daily messages should end
+- `min_gap_hours` - Minimum time between messages (1-6 hours)
+- `distribution_style` - peak_focused, even_spacing, or random
+- `mood_boost_enabled` - Enable frequency boost after low mood
+- `auto_adjust_timing` - Allow system to learn optimal send times
+- `peak_morning/afternoon/evening_start/end` - Customizable peak time windows
+
 ## Deployment Notes
 
 ### Raspberry Pi Deployment
@@ -145,8 +159,10 @@ new_content = MotivationalContent(
 ### Common Issues
 - **Bot not responding**: Check BOT_TOKEN in .env
 - **Database errors**: Verify file permissions
-- **Scheduling issues**: Check system time/timezone
+- **Scheduling issues**: Check system time/timezone, verify user timing preferences
 - **Message delivery failures**: Monitor Telegram API rate limits
+- **Timing not working**: Check user active hours and minimum gap settings
+- **Too many/few messages**: Verify smart scheduling algorithm and mood boost settings
 
 ### Logging
 - Application logs to `motivator_bot.log`
@@ -156,12 +172,14 @@ new_content = MotivationalContent(
 
 ## Future Development Areas
 
-1. **Enhanced Personalization**: Machine learning for content selection
-2. **Crisis Detection**: Keyword monitoring for emergency situations  
-3. **Group Features**: Collaborative goal setting, group challenges
-4. **Analytics Dashboard**: Web interface for usage statistics
-5. **Content Management**: Admin interface for non-technical content updates
-6. **Integration**: Calendar apps, fitness trackers, other mental health tools
+1. **Advanced Timing Features**: Calendar integration, timezone detection, sleep schedule awareness
+2. **Enhanced Personalization**: Machine learning for content selection based on engagement patterns
+3. **Advanced Scheduling**: Weekly patterns, holiday awareness, context-aware timing
+4. **Crisis Detection**: Keyword monitoring for emergency situations  
+5. **Group Features**: Collaborative goal setting, group challenges
+6. **Analytics Dashboard**: Web interface for usage statistics and timing analytics
+7. **Content Management**: Admin interface for non-technical content updates
+8. **Integration**: Calendar apps, fitness trackers, other mental health tools
 
 ## Mental Health Considerations
 

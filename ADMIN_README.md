@@ -369,8 +369,83 @@ For issues with admin commands:
 1. Check the logs for detailed error messages
 2. Verify environment configuration
 3. Ensure database permissions are correct
-4. Restart the bot service if needed
+4. Check smart scheduling settings if timing issues occur
+5. Restart the bot service if needed
 
 **Log Locations:**
 - Application logs: `motivator_bot.log`
 - System logs: `journalctl -u motivator-bot`
+
+**Smart Scheduling Logs:**
+Look for entries containing:
+- "Smart scheduled message"
+- "Smart scheduling check"
+- "Mood boost factor"
+- "Peak time probability"
+
+---
+
+## Database Schema Updates
+
+### New Tables for Smart Scheduling
+
+**`user_timing_preferences`** - Smart scheduling settings:
+- `active_start_hour/minute` - User's active message window
+- `active_end_hour/minute` - When messages should stop
+- `min_gap_hours` - Minimum time between messages (1-6 hours)
+- `distribution_style` - peak_focused, even_spacing, random
+- `mood_boost_enabled` - Frequency boost after low mood
+- `auto_adjust_timing` - Learning system enabled
+- `peak_morning/afternoon/evening_start/end` - Peak time windows
+
+**`message_schedule_log`** - Engagement tracking:
+- `scheduled_time` vs `actual_send_time`
+- `engagement_score` - User response metrics
+- `response_time_minutes` - How quickly user responded
+- `user_mood_before/after` - Mood correlation data
+
+### Admin Database Queries
+
+View user timing preferences:
+```sql
+SELECT * FROM user_timing_preferences WHERE user_id = 1153831100;
+```
+
+Check engagement patterns:
+```sql
+SELECT * FROM message_schedule_log WHERE user_id = 1153831100 ORDER BY created_at DESC LIMIT 10;
+```
+
+Reset user timing preferences:
+```sql
+DELETE FROM user_timing_preferences WHERE user_id = 1153831100;
+DELETE FROM message_schedule_log WHERE user_id = 1153831100;
+```
+
+---
+
+## Smart Scheduling Features
+
+The bot now includes advanced timing features accessible via admin commands and user settings:
+
+### Peak Time Optimization
+- **Morning boost:** 8:00-10:00 AM (default)
+- **Afternoon pickup:** 2:00-4:00 PM (default)  
+- **Evening support:** 6:00-8:00 PM (default)
+- 60% of messages sent during these optimal times
+
+### User Configurable Settings
+Available via `/settings` → `⏰ Timing`:
+- **Active hours:** When user wants to receive messages
+- **Minimum gap:** Time between messages (1-6 hours)
+- **Start/end times:** Personal message window
+
+### Mood-Based Adjustments
+- **Low mood (1-4):** +50% frequency for 24 hours
+- **Very low mood (1-2):** +100% frequency for 12 hours
+- Automatic adjustment based on `/mood` entries
+
+### Engagement Learning
+- Tracks when users respond to messages
+- Learns optimal send times per user
+- Adjusts future scheduling based on engagement

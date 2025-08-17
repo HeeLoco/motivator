@@ -11,7 +11,7 @@ from telegram.constants import ParseMode
 
 from database import Database
 from content import ContentManager, MoodCategory, ContentType
-from scheduler import MessageScheduler
+from smart_scheduler import SmartMessageScheduler
 
 # Enable logging
 logging.basicConfig(
@@ -26,7 +26,7 @@ class MotivatorBot:
         self.admin_user_id = admin_user_id
         self.db = Database()
         self.content_manager = ContentManager()
-        self.scheduler = MessageScheduler(self.db, self.content_manager)
+        self.scheduler = SmartMessageScheduler(self.db, self.content_manager)
         
         # Create application
         self.application = Application.builder().token(bot_token).build()
@@ -198,6 +198,7 @@ Was möchtest du ändern?
                 [InlineKeyboardButton("📊 Häufigkeit", callback_data="set_frequency")],
                 [InlineKeyboardButton("⏸️ Pausieren" if user_settings['active'] else "▶️ Fortsetzen", 
                                     callback_data="toggle_active")],
+                [InlineKeyboardButton("⏰ Zeiten", callback_data="set_timing")],
                 [InlineKeyboardButton("🔄 Zurücksetzen", callback_data="reset_user")],
                 [InlineKeyboardButton("❌ Schließen", callback_data="close_menu")]
             ]
@@ -216,6 +217,7 @@ What would you like to change?
                 [InlineKeyboardButton("📊 Frequency", callback_data="set_frequency")],
                 [InlineKeyboardButton("⏸️ Pause" if user_settings['active'] else "▶️ Resume", 
                                     callback_data="toggle_active")],
+                [InlineKeyboardButton("⏰ Timing", callback_data="set_timing")],
                 [InlineKeyboardButton("🔄 Reset", callback_data="reset_user")],
                 [InlineKeyboardButton("❌ Close", callback_data="close_menu")]
             ]
@@ -608,6 +610,154 @@ What would you like to do?
             
             await query.edit_message_text(text)
         
+        elif data == "set_timing":
+            # Show timing preferences menu
+            user_settings = self.db.get_user_settings(user_id)
+            timing_prefs = self.db.get_user_timing_preferences(user_id)
+            language = user_settings.get('language', 'de') if user_settings else 'de'
+            
+            if timing_prefs:
+                start_time = f"{timing_prefs['active_start_hour']:02d}:{timing_prefs['active_start_minute']:02d}"
+                end_time = f"{timing_prefs['active_end_hour']:02d}:{timing_prefs['active_end_minute']:02d}"
+                min_gap = timing_prefs['min_gap_hours']
+                
+                if language == 'de':
+                    text = f"""⏰ *Nachrichten-Zeiten*
+
+Aktuelle Einstellungen:
+• Aktive Zeiten: {start_time} - {end_time}
+• Mindestabstand: {min_gap} Stunde(n)
+
+Was möchtest du ändern?"""
+                else:
+                    text = f"""⏰ *Message Timing*
+
+Current settings:
+• Active hours: {start_time} - {end_time}
+• Minimum gap: {min_gap} hour(s)
+
+What would you like to change?"""
+                
+                keyboard = [
+                    [InlineKeyboardButton("🌅 Start-Zeit" if language == 'de' else "🌅 Start Time", callback_data="set_start_time")],
+                    [InlineKeyboardButton("🌙 End-Zeit" if language == 'de' else "🌙 End Time", callback_data="set_end_time")],
+                    [InlineKeyboardButton("⏱️ Mindestabstand" if language == 'de' else "⏱️ Min Gap", callback_data="set_min_gap")],
+                    [InlineKeyboardButton("⬅️ Zurück" if language == 'de' else "⬅️ Back", callback_data="back_to_settings")]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+            else:
+                await query.edit_message_text("❌ Fehler beim Laden der Timing-Einstellungen." if language == 'de' else "❌ Error loading timing settings.")
+        
+        elif data == "set_start_time":
+            # Show start time selection
+            user_settings = self.db.get_user_settings(user_id)
+            language = user_settings.get('language', 'de') if user_settings else 'de'
+            
+            if language == 'de':
+                text = "🌅 *Start-Zeit wählen*\n\nWann sollen die Nachrichten beginnen?"
+            else:
+                text = "🌅 *Choose Start Time*\n\nWhen should messages begin?"
+            
+            keyboard = []
+            for hour in range(6, 12):  # 6 AM to 11 AM
+                time_str = f"{hour:02d}:00"
+                keyboard.append([InlineKeyboardButton(time_str, callback_data=f"start_time_{hour}")])
+            
+            keyboard.append([InlineKeyboardButton("⬅️ Zurück" if language == 'de' else "⬅️ Back", callback_data="set_timing")])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+        
+        elif data == "set_end_time":
+            # Show end time selection
+            user_settings = self.db.get_user_settings(user_id)
+            language = user_settings.get('language', 'de') if user_settings else 'de'
+            
+            if language == 'de':
+                text = "🌙 *End-Zeit wählen*\n\nWann sollen die Nachrichten enden?"
+            else:
+                text = "🌙 *Choose End Time*\n\nWhen should messages end?"
+            
+            keyboard = []
+            for hour in range(18, 24):  # 6 PM to 11 PM
+                time_str = f"{hour:02d}:00"
+                keyboard.append([InlineKeyboardButton(time_str, callback_data=f"end_time_{hour}")])
+            
+            keyboard.append([InlineKeyboardButton("⬅️ Zurück" if language == 'de' else "⬅️ Back", callback_data="set_timing")])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+        
+        elif data == "set_min_gap":
+            # Show minimum gap selection
+            user_settings = self.db.get_user_settings(user_id)
+            language = user_settings.get('language', 'de') if user_settings else 'de'
+            
+            if language == 'de':
+                text = "⏱️ *Mindestabstand wählen*\n\nWie viele Stunden sollen mindestens zwischen Nachrichten liegen?"
+            else:
+                text = "⏱️ *Choose Minimum Gap*\n\nHow many hours minimum between messages?"
+            
+            keyboard = []
+            for hours in [1, 2, 3, 4, 6]:
+                if language == 'de':
+                    label = f"{hours} Stunde{'n' if hours > 1 else ''}"
+                else:
+                    label = f"{hours} hour{'s' if hours > 1 else ''}"
+                keyboard.append([InlineKeyboardButton(label, callback_data=f"min_gap_{hours}")])
+            
+            keyboard.append([InlineKeyboardButton("⬅️ Zurück" if language == 'de' else "⬅️ Back", callback_data="set_timing")])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+        
+        elif data.startswith("start_time_"):
+            # Handle start time selection
+            hour = int(data.split("_")[-1])
+            self.db.update_timing_preference(user_id, 'active_start_hour', hour)
+            
+            user_settings = self.db.get_user_settings(user_id)
+            language = user_settings.get('language', 'de') if user_settings else 'de'
+            
+            if language == 'de':
+                text = f"✅ Start-Zeit auf {hour:02d}:00 eingestellt!\n\nVerwende /settings um weitere Einstellungen anzupassen."
+            else:
+                text = f"✅ Start time set to {hour:02d}:00!\n\nUse /settings to adjust more preferences."
+            
+            await query.edit_message_text(text)
+        
+        elif data.startswith("end_time_"):
+            # Handle end time selection
+            hour = int(data.split("_")[-1])
+            self.db.update_timing_preference(user_id, 'active_end_hour', hour)
+            
+            user_settings = self.db.get_user_settings(user_id)
+            language = user_settings.get('language', 'de') if user_settings else 'de'
+            
+            if language == 'de':
+                text = f"✅ End-Zeit auf {hour:02d}:00 eingestellt!\n\nVerwende /settings um weitere Einstellungen anzupassen."
+            else:
+                text = f"✅ End time set to {hour:02d}:00!\n\nUse /settings to adjust more preferences."
+            
+            await query.edit_message_text(text)
+        
+        elif data.startswith("min_gap_"):
+            # Handle minimum gap selection
+            hours = int(data.split("_")[-1])
+            self.db.update_timing_preference(user_id, 'min_gap_hours', hours)
+            
+            user_settings = self.db.get_user_settings(user_id)
+            language = user_settings.get('language', 'de') if user_settings else 'de'
+            
+            if language == 'de':
+                text = f"✅ Mindestabstand auf {hours} Stunde{'n' if hours > 1 else ''} eingestellt!\n\nVerwende /settings um weitere Einstellungen anzupassen."
+            else:
+                text = f"✅ Minimum gap set to {hours} hour{'s' if hours > 1 else ''}!\n\nUse /settings to adjust more preferences."
+            
+            await query.edit_message_text(text)
+        
         elif data == "reset_user":
             # Show reset confirmation
             user_settings = self.db.get_user_settings(user_id)
@@ -713,6 +863,7 @@ Was möchtest du ändern?
                     [InlineKeyboardButton("📊 Häufigkeit", callback_data="set_frequency")],
                     [InlineKeyboardButton("⏸️ Pausieren" if user_settings['active'] else "▶️ Fortsetzen", 
                                         callback_data="toggle_active")],
+                    [InlineKeyboardButton("⏰ Zeiten", callback_data="set_timing")],
                     [InlineKeyboardButton("🔄 Zurücksetzen", callback_data="reset_user")],
                     [InlineKeyboardButton("❌ Schließen", callback_data="close_menu")]
                 ]
@@ -731,6 +882,7 @@ What would you like to change?
                     [InlineKeyboardButton("📊 Frequency", callback_data="set_frequency")],
                     [InlineKeyboardButton("⏸️ Pause" if user_settings['active'] else "▶️ Resume", 
                                         callback_data="toggle_active")],
+                    [InlineKeyboardButton("⏰ Timing", callback_data="set_timing")],
                     [InlineKeyboardButton("🔄 Reset", callback_data="reset_user")],
                     [InlineKeyboardButton("❌ Close", callback_data="close_menu")]
                 ]

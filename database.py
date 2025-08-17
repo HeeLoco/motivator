@@ -81,6 +81,48 @@ class Database:
                 )
             """)
             
+            # User timing preferences table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_timing_preferences (
+                    user_id INTEGER PRIMARY KEY,
+                    active_start_hour INTEGER DEFAULT 8,
+                    active_start_minute INTEGER DEFAULT 0,
+                    active_end_hour INTEGER DEFAULT 22,
+                    active_end_minute INTEGER DEFAULT 0,
+                    min_gap_hours INTEGER DEFAULT 1,
+                    distribution_style TEXT DEFAULT 'peak_focused',
+                    mood_boost_enabled BOOLEAN DEFAULT 1,
+                    auto_adjust_timing BOOLEAN DEFAULT 1,
+                    timezone TEXT DEFAULT 'UTC',
+                    peak_morning_start INTEGER DEFAULT 8,
+                    peak_morning_end INTEGER DEFAULT 10,
+                    peak_afternoon_start INTEGER DEFAULT 14,
+                    peak_afternoon_end INTEGER DEFAULT 16,
+                    peak_evening_start INTEGER DEFAULT 18,
+                    peak_evening_end INTEGER DEFAULT 20,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            """)
+            
+            # Message scheduling log table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS message_schedule_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    scheduled_time TIMESTAMP,
+                    actual_send_time TIMESTAMP,
+                    message_type TEXT,
+                    engagement_score REAL,
+                    response_time_minutes INTEGER,
+                    user_mood_before INTEGER,
+                    user_mood_after INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            """)
+            
             conn.commit()
             logging.info("Database initialized successfully")
 
@@ -398,3 +440,192 @@ class Database:
         except Exception as e:
             logging.error(f"Error getting detailed user info: {e}")
             return None
+
+    def get_user_timing_preferences(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Get user's timing preferences"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT active_start_hour, active_start_minute, active_end_hour, active_end_minute,
+                           min_gap_hours, distribution_style, mood_boost_enabled, auto_adjust_timing,
+                           timezone, peak_morning_start, peak_morning_end, peak_afternoon_start,
+                           peak_afternoon_end, peak_evening_start, peak_evening_end
+                    FROM user_timing_preferences 
+                    WHERE user_id = ?
+                """, (user_id,))
+                result = cursor.fetchone()
+                
+                if result:
+                    return {
+                        'active_start_hour': result[0],
+                        'active_start_minute': result[1],
+                        'active_end_hour': result[2],
+                        'active_end_minute': result[3],
+                        'min_gap_hours': result[4],
+                        'distribution_style': result[5],
+                        'mood_boost_enabled': result[6],
+                        'auto_adjust_timing': result[7],
+                        'timezone': result[8],
+                        'peak_morning_start': result[9],
+                        'peak_morning_end': result[10],
+                        'peak_afternoon_start': result[11],
+                        'peak_afternoon_end': result[12],
+                        'peak_evening_start': result[13],
+                        'peak_evening_end': result[14]
+                    }
+                else:
+                    # Create default preferences for user
+                    return self._create_default_timing_preferences(user_id)
+                
+        except Exception as e:
+            logging.error(f"Error getting timing preferences: {e}")
+            return None
+
+    def _create_default_timing_preferences(self, user_id: int) -> Dict[str, Any]:
+        """Create default timing preferences for a user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR IGNORE INTO user_timing_preferences (user_id)
+                    VALUES (?)
+                """, (user_id,))
+                conn.commit()
+                
+            # Return default values
+            return {
+                'active_start_hour': 8,
+                'active_start_minute': 0,
+                'active_end_hour': 22,
+                'active_end_minute': 0,
+                'min_gap_hours': 1,
+                'distribution_style': 'peak_focused',
+                'mood_boost_enabled': True,
+                'auto_adjust_timing': True,
+                'timezone': 'UTC',
+                'peak_morning_start': 8,
+                'peak_morning_end': 10,
+                'peak_afternoon_start': 14,
+                'peak_afternoon_end': 16,
+                'peak_evening_start': 18,
+                'peak_evening_end': 20
+            }
+            
+        except Exception as e:
+            logging.error(f"Error creating default timing preferences: {e}")
+            return None
+
+    def update_timing_preference(self, user_id: int, setting: str, value: Any) -> bool:
+        """Update a specific timing preference"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Ensure user has timing preferences record
+                cursor.execute("""
+                    INSERT OR IGNORE INTO user_timing_preferences (user_id)
+                    VALUES (?)
+                """, (user_id,))
+                
+                # Update the specific setting
+                cursor.execute(f"""
+                    UPDATE user_timing_preferences 
+                    SET {setting} = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = ?
+                """, (value, user_id))
+                
+                conn.commit()
+                return cursor.rowcount > 0
+                
+        except Exception as e:
+            logging.error(f"Error updating timing preference: {e}")
+            return False
+
+    def log_message_engagement(self, user_id: int, scheduled_time: str, actual_send_time: str, 
+                              message_type: str, engagement_score: float = None, 
+                              response_time_minutes: int = None) -> bool:
+        """Log message engagement for learning user patterns"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO message_schedule_log 
+                    (user_id, scheduled_time, actual_send_time, message_type, 
+                     engagement_score, response_time_minutes)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (user_id, scheduled_time, actual_send_time, message_type, 
+                      engagement_score, response_time_minutes))
+                conn.commit()
+                return True
+                
+        except Exception as e:
+            logging.error(f"Error logging message engagement: {e}")
+            return False
+
+    def get_user_engagement_patterns(self, user_id: int, days: int = 30) -> List[Dict[str, Any]]:
+        """Get user's engagement patterns for the last N days"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT scheduled_time, actual_send_time, engagement_score, 
+                           response_time_minutes, created_at
+                    FROM message_schedule_log 
+                    WHERE user_id = ? AND created_at >= datetime('now', '-{} days')
+                    ORDER BY created_at DESC
+                """.format(days), (user_id,))
+                
+                results = cursor.fetchall()
+                return [{
+                    'scheduled_time': r[0],
+                    'actual_send_time': r[1], 
+                    'engagement_score': r[2],
+                    'response_time_minutes': r[3],
+                    'created_at': r[4]
+                } for r in results]
+                
+        except Exception as e:
+            logging.error(f"Error getting engagement patterns: {e}")
+            return []
+
+    def get_message_stats_by_date(self, user_id: int, date: str) -> int:
+        """Get count of messages sent to user on specific date"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT COUNT(*) FROM sent_messages 
+                    WHERE user_id = ? AND DATE(sent_at) = ?
+                """, (user_id, date))
+                result = cursor.fetchone()
+                return result[0] if result else 0
+                
+        except Exception as e:
+            logging.error(f"Error getting message stats by date: {e}")
+            return 0
+
+    def get_message_stats_detailed(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get detailed message statistics for user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT message_type, content_preview, sent_at, feedback
+                    FROM sent_messages 
+                    WHERE user_id = ? 
+                    ORDER BY sent_at DESC 
+                    LIMIT ?
+                """, (user_id, limit))
+                
+                results = cursor.fetchall()
+                return [{
+                    'message_type': r[0],
+                    'content_preview': r[1],
+                    'sent_at': r[2],
+                    'feedback': r[3]
+                } for r in results]
+                
+        except Exception as e:
+            logging.error(f"Error getting detailed message stats: {e}")
+            return []
