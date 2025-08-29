@@ -1,0 +1,145 @@
+{
+  "content": {
+    "de": [
+      {
+        "content": "Du schaffst das! Jeder kleine Schritt bringt dich deinem Ziel näher. 💪",
+        "type": "TEXT",
+        "category": "MOTIVATION",
+        "tags": ["motivation", "ziel", "fortschritt"]
+      },
+      {
+        "content": "Denk daran: Es ist okay, nicht okay zu sein. Du bist nicht allein mit deinen Gefühlen. 🤗",
+        "type": "TEXT", 
+        "category": "ANXIETY",
+        "tags": ["angst", "unterstützung", "gefühle"]
+      },
+      {
+        "content": "Nimm dir heute 5 Minuten Zeit für Achtsamkeit. Atme tief durch und sei im Moment. 🧘‍♀️",
+        "type": "TEXT",
+        "category": "SELF_CARE",
+        "tags": ["achtsamkeit", "entspannung", "selbstfürsorge"]
+      },
+      {
+        "content": "Schwierige Zeiten gehen vorbei. Du warst schon stärker als du dachtest - du kannst es wieder sein. 🌅",
+        "type": "TEXT",
+        "category": "DEPRESSION",
+        "tags": ["depression", "stärke", "hoffnung"]
+      },
+      {
+        "content": "Stress ist temporär, aber deine Fähigkeit damit umzugehen wächst jeden Tag. 🌱",
+        "type": "TEXT",
+        "category": "STRESS",
+        "tags": ["stress", "bewältigung", "wachstum"]
+      },
+      {
+        "content": "Diese 5-Minuten Atemübung kann dir helfen, dich zu entspannen und den Stress abzubauen.",
+        "type": "VIDEO",
+        "category": "STRESS", 
+        "media_url": "https://www.youtube.com/watch?v=YRPh_GaiL8s",
+        "tags": ["atemübung", "entspannung", "video"]
+      },
+      {
+        "content": "Ein beruhigendes Bild eines stillen Sees - perfekt für einen Moment der Ruhe. 🏞️",
+        "type": "IMAGE",
+        "category": "SELF_CARE",
+        "media_url": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4",
+        "tags": ["ruhe", "natur", "entspannung"]
+      },
+      {
+        "content": "Hier findest du professionelle Hilfe und Ressourcen für mentale Gesundheit in Deutschland.",
+        "type": "LINK",
+        "category": "GENERAL",
+        "media_url": "https://www.deutsche-depressionshilfe.de/depression-infos-und-hilfe/wo-finde-ich-hilfe",
+        "tags": ["hilfe", "ressourcen", "professionell"]
+      },
+      {
+        "content": "Geführte Meditation für besseren Schlaf - entspanne dich nach einem langen Tag. 🌙",
+        "type": "VIDEO",
+        "category": "SELF_CARE",
+        "media_url": "https://www.youtube.com/watch?v=aAVPDYQ9_SQ",
+        "tags": ["meditation", "schlaf", "entspannung"]
+      },
+      {
+        "content": "Du bist genug. Du warst schon immer genug. Du wirst immer genug sein. ✨",
+        "type": "TEXT",
+        "category": "MOTIVATION",
+        "tags": ["selbstwert", "akzeptanz", "liebe"]
+      }
+    ],
+    "en": [
+      {
+        "content": "You've got this! Every small step brings you closer to your goal. 💪",
+        "type": "TEXT",
+        "category": "MOTIVATION",
+        "tags": ["motivation", "goal", "progress"]
+      },
+      {
+        "content": "Remember: It's okay to not be okay. You're not alone with your feelings. 🤗",
+        "type": "TEXT",
+        "category": "ANXIETY", 
+        "tags": ["anxiety", "support", "feelings"]
+      },
+      {
+        "content": "Take 5 minutes today for mindfulness. Breathe deeply and be present. 🧘‍♀️",
+        "type": "TEXT",
+        "category": "SELF_CARE",
+        "tags": ["mindfulness", "relaxation", "self-care"]
+      },
+      {
+        "content": "Difficult times pass. You've been stronger than you thought - you can be again. 🌅",
+        "type": "TEXT",
+        "category": "DEPRESSION",
+        "tags": ["depression", "strength", "hope"]
+      },
+      {
+        "content": "Stress is temporary, but your ability to handle it grows every day. 🌱",
+        "type": "TEXT",
+        "category": "STRESS",
+        "tags": ["stress", "coping", "growth"]
+      },
+      {
+        "content": "This 5-minute breathing exercise can help you relax and reduce stress.",
+        "type": "VIDEO",
+        "category": "STRESS",
+        "media_url": "https://www.youtube.com/watch?v=YRPh_GaiL8s",
+        "tags": ["breathing", "relaxation", "video"]
+      },
+      {
+        "content": "A calming image of a peaceful lake - perfect for a moment of tranquility. 🏞️",
+        "type": "IMAGE", 
+        "category": "SELF_CARE",
+        "media_url": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4",
+        "tags": ["peace", "nature", "relaxation"]
+      },
+      {
+        "content": "Find professional mental health resources and support here.",
+        "type": "LINK",
+        "category": "GENERAL",
+        "media_url": "https://www.nami.org/help",
+        "tags": ["help", "resources", "professional"]
+      },
+      {
+        "content": "Guided meditation for better sleep - relax after a long day. 🌙",
+        "type": "VIDEO",
+        "category": "SELF_CARE",
+        "media_url": "https://www.youtube.com/watch?v=aAVPDYQ9_SQ",
+        "tags": ["meditation", "sleep", "relaxation"]
+      },
+      {
+        "content": "You are enough. You have always been enough. You will always be enough. ✨",
+        "type": "TEXT",
+        "category": "MOTIVATION",
+        "tags": ["self-worth", "acceptance", "love"]
+      }
+    ]
+  },
+  "metadata": {
+    "version": "1.0",
+    "created_by": "MotivatOR Bot Content Team",
+    "description": "Example content file showing all content types and categories",
+    "total_items": 20,
+    "languages": ["de", "en"],
+    "content_types": ["TEXT", "VIDEO", "IMAGE", "LINK"],
+    "categories": ["MOTIVATION", "ANXIETY", "SELF_CARE", "DEPRESSION", "STRESS", "GENERAL"]
+  }
+}
