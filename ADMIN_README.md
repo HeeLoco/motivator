@@ -1,6 +1,6 @@
-# MotivatOR Bot - Admin Commands Documentation
+# Motivator Bot - Admin Commands Documentation
 
-This document provides comprehensive documentation for all administrative commands available in the MotivatOR Bot. These commands are restricted to users with valid `ADMIN_USER_ID` credentials.
+This document provides comprehensive documentation for all administrative commands available in the Motivator Bot. These commands are restricted to users with valid `ADMIN_USER_ID` credentials.
 
 ## Setup
 

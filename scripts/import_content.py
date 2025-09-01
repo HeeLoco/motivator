@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Content Import Script for MotivatOR Bot
+Content Import Script for Motivator Bot
 
 This script imports motivational content from a JSON file into the bot's content system.
 Supports all content types: TEXT, IMAGE, VIDEO, LINK

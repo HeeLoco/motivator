@@ -1,7 +1,7 @@
 """
-MotivatOR Bot - Mental Health Support Bot
+Motivator Bot - Mental Health Support Bot
 
-This package contains the core modules for the MotivatOR Telegram bot.
+This package contains the core modules for the Motivator Telegram bot.
 """
 
 from .bot import MotivatorBot

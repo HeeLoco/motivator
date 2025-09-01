@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MotivatOR Bot - A Telegram bot for mental health motivation and support
+Motivator Bot - A Telegram bot for mental health motivation and support
 
 This bot sends personalized motivational messages to users throughout the day,
 tracks mood and goals, and provides mental health resources.
@@ -52,7 +52,7 @@ def main():
     
     # Create and start the bot
     try:
-        logger.info("Initializing MotivatOR Bot...")
+        logger.info("Initializing Motivator Bot...")
         bot = MotivatorBot(bot_token, admin_user_id)
         
         logger.info("Starting bot...")

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MotivatOR Bot is a Telegram bot designed for mental health support and motivation. It sends personalized motivational messages, tracks user mood, manages goals, and provides mental health resources. The bot is designed to run on a Raspberry Pi and supports bilingual content (English/German).
+Motivator Bot is a Telegram bot designed for mental health support and motivation. It sends personalized motivational messages, tracks user mood, manages goals, and provides mental health resources. The bot is designed to run on a Raspberry Pi and supports bilingual content (English/German).
 
 **Purpose**: Support individuals with psychological challenges through automated motivational messaging, mood tracking, and goal management.
 

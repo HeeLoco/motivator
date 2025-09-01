@@ -66,7 +66,7 @@ class MotivatorBot:
         self.db.add_user(user.id, user.username, user.first_name)
         
         welcome_text = f"""
-🌟 *Willkommen beim MotivatOR Bot, {user.first_name}!* 🌟
+🌟 *Willkommen beim Motivator Bot, {user.first_name}!* 🌟
 
 Ich bin hier, um dich mit personalisierten motivierenden Nachrichten den ganzen Tag über zu unterstützen.
 
@@ -111,7 +111,7 @@ Welche Sprache bevorzugst du?
         
         if language == 'de':
             help_text = """
-🤖 *MotivatOR Bot Hilfe*
+🤖 *Motivator Bot Hilfe*
 
 *Befehle:*
 /start - Bot starten und einrichten
@@ -141,7 +141,7 @@ Ich bin hier, um dich zu unterstützen! 💙
 """
         else:
             help_text = """
-🤖 *MotivatOR Bot Help*
+🤖 *Motivator Bot Help*
 
 *Commands:*
 /start - Start and setup the bot
@@ -1612,5 +1612,5 @@ Are you sure you want to proceed?"""
         self.scheduler.start(self)
         
         # Start the bot
-        logger.info("Starting MotivatOR Bot...")
+        logger.info("Starting Motivator Bot...")
         self.application.run_polling(allowed_updates=Update.ALL_TYPES)

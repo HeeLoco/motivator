@@ -1,4 +1,4 @@
-# MotivatOR Bot 🤖💙
+# Motivator Bot 🤖💙
 
 A Telegram bot designed to support mental health and motivation through personalized messages, mood tracking, and goal setting. Perfect for individuals dealing with psychological challenges and their support networks.
 
@@ -209,7 +209,7 @@ Create `/etc/systemd/system/motivator-bot.service`:
 
 ```ini
 [Unit]
-Description=MotivatOR Telegram Bot
+Description=Motivator Telegram Bot
 After=network.target
 
 [Service]
