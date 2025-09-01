@@ -11,7 +11,7 @@ import sys
 import logging
 from dotenv import load_dotenv
 
-from bot import MotivatorBot
+from src.bot import MotivatorBot
 
 def setup_logging():
     """Setup logging configuration"""

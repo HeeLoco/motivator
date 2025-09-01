@@ -6,7 +6,7 @@ Test script to manually send a motivational message
 import os
 import asyncio
 from dotenv import load_dotenv
-from bot import MotivatorBot
+from src.bot import MotivatorBot
 
 async def test_send_message():
     """Test sending a message to a user"""

@@ -10,7 +10,7 @@ import json
 import sys
 import logging
 from typing import List, Dict, Any
-from content import ContentManager, MotivationalContent, ContentType, MoodCategory
+from src.content import ContentManager, MotivationalContent, ContentType, MoodCategory
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

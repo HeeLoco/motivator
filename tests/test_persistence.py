@@ -3,7 +3,7 @@
 Test script to verify settings persistence
 """
 
-from database import Database
+from src.database import Database
 
 def test_persistence():
     """Test that user settings persist after add_user calls"""

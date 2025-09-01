@@ -9,9 +9,9 @@ from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKe
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from telegram.constants import ParseMode
 
-from database import Database
-from content import ContentManager, MoodCategory, ContentType
-from smart_scheduler import SmartMessageScheduler
+from .database import Database
+from .content import ContentManager, MoodCategory, ContentType
+from .smart_scheduler import SmartMessageScheduler
 
 # Enable logging
 logging.basicConfig(
