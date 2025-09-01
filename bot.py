@@ -1565,8 +1565,12 @@ Are you sure you want to proceed?"""
         recent_mood = self.db.get_recent_mood(user_id, 1)
         mood_score = recent_mood[0]['score'] if recent_mood else 5
         
-        # Get appropriate content
-        content = self.content_manager.get_content_by_mood(mood_score, language)
+        # Get recently sent content IDs to avoid duplicates
+        duplicate_avoidance_count = user_settings.get('duplicate_avoidance_count', 5)
+        recent_content_ids = self.db.get_recent_sent_content_ids(user_id, duplicate_avoidance_count)
+        
+        # Get appropriate content while avoiding recent duplicates
+        content = self.content_manager.get_content_by_mood(mood_score, language, recent_content_ids)
         
         if not content:
             return

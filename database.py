@@ -163,7 +163,7 @@ class Database:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT language, timezone, message_frequency, active 
+                    SELECT language, timezone, message_frequency, active, duplicate_avoidance_count 
                     FROM users WHERE user_id = ?
                 """, (user_id,))
                 result = cursor.fetchone()
@@ -172,7 +172,8 @@ class Database:
                         'language': result[0],
                         'timezone': result[1], 
                         'message_frequency': result[2],
-                        'active': result[3]
+                        'active': result[3],
+                        'duplicate_avoidance_count': result[4] or 5
                     }
                 return None
         except Exception as e:
@@ -254,6 +255,23 @@ class Database:
                 return [{'score': r[0], 'note': r[1], 'date': r[2]} for r in results]
         except Exception as e:
             logging.error(f"Error getting recent mood: {e}")
+            return []
+
+    def get_recent_sent_content_ids(self, user_id: int, limit: int = 5) -> List[int]:
+        """Get recently sent content IDs to avoid duplicates"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT content_id 
+                    FROM sent_messages 
+                    WHERE user_id = ? AND content_id IS NOT NULL
+                    ORDER BY sent_at DESC 
+                    LIMIT ?
+                """, (user_id, limit))
+                return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            logging.error(f"Error getting recent sent content IDs: {e}")
             return []
 
     def add_goal(self, user_id: int, goal_text: str, category: str = None, target_date: str = None) -> bool:

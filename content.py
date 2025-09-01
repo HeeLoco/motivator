@@ -117,7 +117,7 @@ class ContentManager:
         
         return random.choice(available_content) if available_content else None
     
-    def get_content_by_mood(self, mood_score: int, language: str = 'de') -> MotivationalContent:
+    def get_content_by_mood(self, mood_score: int, language: str = 'de', exclude_recent: List[int] = None) -> MotivationalContent:
         """Get content based on mood score (1-10, where 1 is very low, 10 is excellent)"""
         if mood_score <= 3:
             # Low mood - depression/anxiety support
@@ -130,7 +130,7 @@ class ContentManager:
             categories = [MoodCategory.MOTIVATION, MoodCategory.GENERAL]
         
         category = random.choice(categories)
-        return self.get_random_content(language, category)
+        return self.get_random_content(language, category, exclude_recent)
     
     def get_all_content(self, language: str = None) -> List[MotivationalContent]:
         """Get all content, optionally filtered by language"""
