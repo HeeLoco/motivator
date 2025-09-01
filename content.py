@@ -75,20 +75,20 @@ class ContentManager:
             MotivationalContent(17, "Deine psychische Gesundheit ist genauso wichtig wie deine körperliche. Sorge für beides. 🧠❤️", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
 
 
-            MotivationalContent(29, „Kleine Schritte sind besser als keine Schritte.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(30, „Das Geheimnis des Erfolgs ist anzufangen.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(31, „Machen ist wie wollen – nur krasser.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(32, „Wenn du keine Lust hast, von vorne anzufangen, dann gib nicht auf.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(33, „Du kannst die Zukunft verändern mit dem, was du heute tust.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(34, „Ehrgeiz ist die Fähigkeit, die Träume real werden lässt.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(29, "Kleine Schritte sind besser als keine Schritte.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(30, "Das Geheimnis des Erfolgs ist anzufangen.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(31, "Machen ist wie wollen – nur krasser.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(32, "Wenn du keine Lust hast, von vorne anzufangen, dann gib nicht auf.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(33, "Du kannst die Zukunft verändern mit dem, was du heute tust.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(34, "Ehrgeiz ist die Fähigkeit, die Träume real werden lässt.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
 
 
-            MotivationalContent(34, „Innen muss etwas brennen, damit außen etwas leuchten kann.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(35, „Scheitern ist nicht das Gegenteil von Erfolg. Es ist ein Teil davon.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(36, „Nicht wie groß der erste Schritt ist zählt, sondern die richtige Richtung.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(37, „Warte nicht auf Motivation. Sei du die Motivation für andere!“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(38, „Höre nicht auf, wenn es weh tut. Höre auf, wenn du fertig bist.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-            MotivationalContent(39, „Sobald wir unseren Geist auf ein Ziel richten, kommt es uns entgegen.“, ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(34, "Innen muss etwas brennen, damit außen etwas leuchten kann.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(35, "Scheitern ist nicht das Gegenteil von Erfolg. Es ist ein Teil davon.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(36, "Nicht wie groß der erste Schritt ist zählt, sondern die richtige Richtung.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(37, "Warte nicht auf Motivation. Sei du die Motivation für andere!", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(38, "Höre nicht auf, wenn es weh tut. Höre auf, wenn du fertig bist.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(39, "Sobald wir unseren Geist auf ein Ziel richten, kommt es uns entgegen.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
 
 
             # Angst-Unterstützung
