@@ -274,19 +274,134 @@ class Database:
             logging.error(f"Error getting recent sent content IDs: {e}")
             return []
 
-    def add_goal(self, user_id: int, goal_text: str, category: str = None, target_date: str = None) -> bool:
-        """Add user goal"""
+    def add_goal(self, user_id: int, goal_text: str, category: str = None, target_date: str = None, 
+                 difficulty_level: str = 'beginner', goal_type: str = 'custom', is_daily: bool = True) -> int:
+        """Add user goal and return the goal ID"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO user_goals (user_id, goal_text, category, target_date)
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, goal_text, category, target_date))
+                    INSERT INTO user_goals (user_id, goal_text, category, target_date, difficulty_level, goal_type, is_daily)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (user_id, goal_text, category, target_date, difficulty_level, goal_type, is_daily))
                 conn.commit()
-                return True
+                return cursor.lastrowid
         except Exception as e:
             logging.error(f"Error adding goal: {e}")
+            return 0
+
+    def get_user_goals(self, user_id: int, active_only: bool = True) -> List[Dict]:
+        """Get user's goals"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT id, goal_text, category, target_date, completed, created_at, 
+                           completed_at, streak_days, last_check_in, difficulty_level, goal_type, is_daily
+                    FROM user_goals 
+                    WHERE user_id = ?
+                """
+                if active_only:
+                    query += " AND completed = 0"
+                query += " ORDER BY created_at DESC"
+                
+                cursor.execute(query, (user_id,))
+                results = cursor.fetchall()
+                
+                goals = []
+                for r in results:
+                    goals.append({
+                        'id': r[0], 'text': r[1], 'category': r[2], 'target_date': r[3],
+                        'completed': r[4], 'created_at': r[5], 'completed_at': r[6],
+                        'streak_days': r[7], 'last_check_in': r[8], 'difficulty_level': r[9],
+                        'goal_type': r[10], 'is_daily': r[11]
+                    })
+                return goals
+        except Exception as e:
+            logging.error(f"Error getting user goals: {e}")
+            return []
+
+    def update_goal_progress(self, goal_id: int, user_id: int) -> bool:
+        """Update goal progress (daily check-in)"""
+        try:
+            today = datetime.now().date()
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Get current goal info
+                cursor.execute("""
+                    SELECT streak_days, last_check_in 
+                    FROM user_goals 
+                    WHERE id = ? AND user_id = ?
+                """, (goal_id, user_id))
+                result = cursor.fetchone()
+                
+                if not result:
+                    return False
+                
+                current_streak, last_check_in = result
+                
+                # Calculate new streak
+                if last_check_in:
+                    last_date = datetime.strptime(last_check_in, '%Y-%m-%d').date()
+                    days_diff = (today - last_date).days
+                    
+                    if days_diff == 1:
+                        # Consecutive day - increment streak
+                        new_streak = current_streak + 1
+                    elif days_diff == 0:
+                        # Same day - no change
+                        return True
+                    else:
+                        # Streak broken - reset to 1
+                        new_streak = 1
+                else:
+                    # First check-in
+                    new_streak = 1
+                
+                # Update goal
+                cursor.execute("""
+                    UPDATE user_goals 
+                    SET streak_days = ?, last_check_in = ?
+                    WHERE id = ? AND user_id = ?
+                """, (new_streak, today.isoformat(), goal_id, user_id))
+                
+                conn.commit()
+                return True
+                
+        except Exception as e:
+            logging.error(f"Error updating goal progress: {e}")
+            return False
+
+    def complete_goal(self, goal_id: int, user_id: int) -> bool:
+        """Mark goal as completed"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE user_goals 
+                    SET completed = 1, completed_at = ?
+                    WHERE id = ? AND user_id = ?
+                """, (datetime.now(), goal_id, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logging.error(f"Error completing goal: {e}")
+            return False
+
+    def delete_goal(self, goal_id: int, user_id: int) -> bool:
+        """Delete a goal"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    DELETE FROM user_goals 
+                    WHERE id = ? AND user_id = ?
+                """, (goal_id, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logging.error(f"Error deleting goal: {e}")
             return False
 
     def get_active_users(self) -> List[int]:
