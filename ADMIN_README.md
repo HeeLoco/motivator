@@ -344,9 +344,6 @@ Admin operations are logged with INFO level:
 ```bash
 # View logs
 tail -f motivator_bot.log
-
-# Or with systemd
-journalctl -u motivator-bot -f
 ```
 
 ---
@@ -374,7 +371,6 @@ For issues with admin commands:
 
 **Log Locations:**
 - Application logs: `motivator_bot.log`
-- System logs: `journalctl -u motivator-bot`
 
 **Smart Scheduling Logs:**
 Look for entries containing:

@@ -68,7 +68,6 @@ deactivate              # Stop working
 ### 1. Prerequisites
 - Python 3.8+
 - Telegram Bot Token (from @BotFather)
-- Raspberry Pi (recommended) or any Linux/macOS/Windows system
 
 ### 2. Installation
 
@@ -176,71 +175,6 @@ SELECT * FROM mood_entries WHERE user_id = 123 ORDER BY created_at DESC;
 SELECT feedback_type, COUNT(*) FROM feedback GROUP BY feedback_type;
 ```
 
-## Deployment on Raspberry Pi
-
-### 1. System Setup
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install Python dependencies
-sudo apt install python3-pip python3-venv -y
-
-# Navigate to project directory
-cd /home/pi/motivator
-
-# Create virtual environment
-python3 -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate
-
-# Upgrade pip and install dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# Setup environment file
-cp .env.example .env
-nano .env  # Add your bot token
-```
-
-### 2. Auto-start Service
-Create `/etc/systemd/system/motivator-bot.service`:
-
-```ini
-[Unit]
-Description=Motivator Telegram Bot
-After=network.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/motivator
-Environment=PATH=/home/pi/motivator/venv/bin
-ExecStart=/home/pi/motivator/venv/bin/python main.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-```bash
-sudo systemctl enable motivator-bot
-sudo systemctl start motivator-bot
-sudo systemctl status motivator-bot
-```
-
-### 3. Monitoring
-```bash
-# View logs
-sudo journalctl -u motivator-bot -f
-
-# Check bot status
-sudo systemctl status motivator-bot
-```
-
 ## Architecture
 
 ### File Structure
@@ -281,7 +215,7 @@ The bot supports group chats for beta testing:
 
 - No personal data shared with third parties
 - Local SQLite database (not cloud-based)
-- Mood and message data stored locally on your Raspberry Pi
+- Mood and message data stored locally on your system
 - Optional data export for personal analysis
 - User can delete their data anytime
 
