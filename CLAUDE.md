@@ -19,11 +19,17 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your BOT_TOKEN from @BotFather
 
-# Run the bot
+# Run the bot (default: INFO level, text format)
 python main.py
 
 # Run with debug logging
-python main.py --debug
+LOG_LEVEL=DEBUG python main.py
+
+# Run with JSON logging (for testing container format)
+LOG_FORMAT=json python main.py
+
+# Run with custom log file
+LOG_FILE=custom.log python main.py
 ```
 
 ### Database Management
@@ -40,10 +46,19 @@ python main.py  # Recreates database
 ```
 
 ### Testing
-- No formal test suite exists yet
-- Test manually by interacting with the bot
-- Use group chats for beta testing
-- Monitor logs with `tail -f motivator_bot.log`
+```bash
+# Test logging system (both JSON and text formats)
+python test_logging.py
+
+# Test module imports
+python test_imports.py
+
+# Manual testing
+# - Test manually by interacting with the bot
+# - Use group chats for beta testing
+# - Monitor logs: tail -f motivator_bot.log
+# - Monitor container logs: docker compose logs -f
+```
 
 ## Architecture
 
@@ -52,12 +67,13 @@ python main.py  # Recreates database
 The bot uses a **modular handler architecture** with clear separation of concerns:
 
 **Core Modules:**
-1. **`main.py`** - Entry point, environment setup, logging configuration
-2. **`bot.py`** - Orchestrator (152 lines) - coordinates handlers and manages application lifecycle
-3. **`database.py`** - SQLite operations, user data management, analytics
-4. **`content.py`** - Motivational content management, categorization, multi-language support
-5. **`smart_scheduler.py`** - Intelligent message scheduling with peak-time optimization
-6. **`goals.py`** - Goal templates and management logic
+1. **`main.py`** - Entry point, environment setup, logging initialization
+2. **`bot.py`** - Orchestrator - coordinates handlers and manages application lifecycle
+3. **`logging_config.py`** - Structured logging with JSON/text formatters, correlation IDs, environment-based configuration
+4. **`database.py`** - SQLite operations, user data management, analytics
+5. **`content.py`** - Motivational content management, categorization, multi-language support
+6. **`smart_scheduler.py`** - Intelligent message scheduling with peak-time optimization
+7. **`goals.py`** - Goal templates and management logic
 
 **Handler Modules** (`src/handlers/`):
 - **`base.py`** - Base handler class with shared utilities
@@ -141,8 +157,17 @@ new_content = MotivationalContent(
 ## Configuration
 
 ### Environment Variables
+
+**Bot Configuration:**
 - `BOT_TOKEN` (required) - From @BotFather on Telegram
 - `ADMIN_USER_ID` (optional) - Admin user for bot management
+
+**Logging Configuration:**
+- `LOG_LEVEL` (optional, default: INFO) - Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `LOG_FORMAT` (optional, auto-detected) - Format type ('json' or 'text')
+  - Auto-detects 'json' in containers, 'text' in development
+- `LOG_FILE` (optional, default: motivator_bot.log in dev, disabled in containers) - Log file path
+- `CONTAINER_ENV` (optional, auto-detected) - Set to 'true' to force container mode
 
 ### User Settings (Database)
 - `language` - 'en' or 'de' 
@@ -159,34 +184,184 @@ new_content = MotivationalContent(
 - `auto_adjust_timing` - Allow system to learn optimal send times
 - `peak_morning/afternoon/evening_start/end` - Customizable peak time windows
 
-## Deployment Notes
+## Deployment
 
-### General Deployment
-- Virtual environment recommended
-- SQLite database requires write permissions
-- Monitor logs in `motivator_bot.log`
+### Local Development
+```bash
+# Virtual environment recommended
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with BOT_TOKEN
+
+# Run the bot
+python main.py
+```
+
+### Docker Deployment
+
+**Build and run with Docker Compose:**
+```bash
+# Create .env file with BOT_TOKEN
+cp .env.example .env
+# Edit .env file
+
+# Build and start the bot
+docker compose up -d
+
+# View logs (JSON format)
+docker compose logs -f
+
+# View logs with grep filtering
+docker compose logs -f | grep ERROR
+
+# Stop the bot
+docker compose down
+
+# Restart the bot
+docker compose restart
+
+# View bot status
+docker compose ps
+```
+
+**Logging in Containers:**
+- Logs output to stdout/stderr in JSON format
+- Captured by Docker's json-file driver
+- Max 3 files, 10MB each (rotates automatically)
+- View with: `docker compose logs -f`
+- File logging disabled by default in containers
+
+**Database Persistence:**
+- Database mounted as volume in docker-compose.yml
+- Survives container restarts
+- Backup: `cp motivator.db motivator.db.backup`
+
+**Optional: Log Aggregation with Loki**
+Uncomment the Loki, Promtail, and Grafana sections in docker-compose.yml to enable centralized logging:
+```bash
+docker compose up -d
+# Access Grafana at http://localhost:3000 (admin/admin)
+```
 
 ### Security Considerations
 - No sensitive data in code - use environment variables
-- Local SQLite database (no cloud storage)
+- Bot token in .env file (never commit to git)
+- .env file excluded from Docker builds (.dockerignore)
+- SQLite database with local storage only
 - User data remains on local system
-- Bot token should be protected
+- Container runs as non-root (future enhancement)
 
 ## Debugging and Monitoring
 
-### Common Issues
-- **Bot not responding**: Check BOT_TOKEN in .env
-- **Database errors**: Verify file permissions
-- **Scheduling issues**: Check system time/timezone, verify user timing preferences
-- **Message delivery failures**: Monitor Telegram API rate limits
-- **Timing not working**: Check user active hours and minimum gap settings
-- **Too many/few messages**: Verify smart scheduling algorithm and mood boost settings
+### Logging System
 
-### Logging
-- Application logs to `motivator_bot.log`
-- Database operations logged at INFO level
-- Scheduler events logged for debugging
-- Error handling with user-friendly messages
+The bot uses a **dual-format structured logging system** optimized for both development and production:
+
+**Architecture:**
+- **Development**: Human-readable text format with color coding
+- **Container**: Structured JSON format for machine parsing
+- **Auto-detection**: Automatically selects format based on environment
+- **Correlation IDs**: Track related operations across log entries
+- **Structured Context**: User IDs, extra fields, and metadata
+
+**Log Levels:**
+- `DEBUG`: Detailed diagnostic info (includes module, function, line number)
+- `INFO`: General operational events (default)
+- `WARNING`: Unexpected but handled situations
+- `ERROR`: Errors requiring attention
+- `CRITICAL`: Critical failures
+
+**Configuration:**
+```bash
+# Set log level
+export LOG_LEVEL=DEBUG
+
+# Force format (overrides auto-detection)
+export LOG_FORMAT=json  # or 'text'
+
+# Custom log file (default: motivator_bot.log in dev, disabled in containers)
+export LOG_FILE=/path/to/custom.log
+
+# Force container mode
+export CONTAINER_ENV=true
+```
+
+**Example Text Output (Development):**
+```
+2025-11-03 14:30:15 - smart_scheduler - INFO - [user:12345 | corr:msg_abc123] - Message sent successfully (mood_category=MOTIVATION, message_frequency=3)
+```
+
+**Example JSON Output (Container):**
+```json
+{"timestamp": "2025-11-03T14:30:15Z", "level": "INFO", "logger": "smart_scheduler", "user_id": 12345, "correlation_id": "msg_abc123", "message": "Message sent successfully", "mood_category": "MOTIVATION", "message_frequency": 3}
+```
+
+**Using Logging in Code:**
+```python
+from src.logging_config import get_logger, log_with_context
+import logging
+
+logger = get_logger(__name__)
+
+# Basic logging
+logger.info("Operation completed")
+
+# Logging with context
+log_with_context(
+    logger, logging.INFO,
+    "Message sent",
+    user_id=12345,
+    mood_category="MOTIVATION",
+    success=True
+)
+
+# Correlation IDs (for tracking related operations)
+from src.logging_config import set_correlation_id, clear_correlation_id
+
+correlation_id = f"msg_{user_id}_{uuid.uuid4().hex[:8]}"
+set_correlation_id(correlation_id)
+logger.info("Starting operation")
+# ... do work ...
+logger.info("Completed operation")
+clear_correlation_id()
+```
+
+**Monitoring Logs:**
+```bash
+# Development (text format)
+tail -f motivator_bot.log
+tail -f motivator_bot.log | grep ERROR
+
+# Container (JSON format)
+docker compose logs -f
+docker compose logs -f | grep '"level":"ERROR"'
+docker compose logs -f | jq 'select(.user_id == 12345)'
+
+# Filter by correlation ID
+docker compose logs -f | jq 'select(.correlation_id == "msg_abc123")'
+```
+
+**Database Logging:**
+The bot also maintains separate database logging for analytics:
+- `sent_messages` - Message delivery tracking
+- `message_schedule_log` - Engagement tracking for learning
+- `feedback` - User feedback on messages
+- `mood_entries` - Mood tracking history
+
+### Common Issues
+- **Bot not responding**: Check BOT_TOKEN in .env, check logs for startup errors
+- **Database errors**: Verify file permissions, check logs for SQL errors
+- **Scheduling issues**: Check system time/timezone, verify user timing preferences, review scheduler logs
+- **Message delivery failures**: Monitor Telegram API rate limits, check ERROR level logs
+- **Timing not working**: Check user active hours and minimum gap settings
+- **Too many/few messages**: Verify smart scheduling algorithm and mood boost settings, review DEBUG logs
+- **Logging not working**: Verify LOG_LEVEL environment variable, check file permissions for log file
 
 ## Future Development Areas
 

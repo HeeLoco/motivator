@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  motivator-bot:
+    build: .
+    container_name: motivator-bot
+    restart: unless-stopped
+
+    # Environment variables
+    environment:
+      # Bot configuration (set these in .env file)
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ADMIN_USER_ID=${ADMIN_USER_ID:-}
+
+      # Logging configuration
+      - CONTAINER_ENV=true
+      - LOG_FORMAT=json
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # File logging disabled in container (logs go to stdout/stderr)
+      - LOG_FILE=
+
+    # Mount database as volume for persistence
+    volumes:
+      - ./data:/data
+      - ./motivator.db:/app/motivator.db
+
+    # Logging configuration for Docker
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=motivator-bot"
+        tag: "{{.Name}}/{{.ID}}"
+
+    # Health check (optional)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Optional: Add Grafana Loki for log aggregation
+# Uncomment the sections below to enable Loki
+
+#   loki:
+#     image: grafana/loki:2.9.0
+#     container_name: loki
+#     restart: unless-stopped
+#     ports:
+#       - "3100:3100"
+#     command: -config.file=/etc/loki/local-config.yaml
+#     volumes:
+#       - ./loki-data:/loki
+#
+#   promtail:
+#     image: grafana/promtail:2.9.0
+#     container_name: promtail
+#     restart: unless-stopped
+#     volumes:
+#       - /var/lib/docker/containers:/var/lib/docker/containers:ro
+#       - ./promtail-config.yml:/etc/promtail/config.yml
+#     command: -config.file=/etc/promtail/config.yml
+#     depends_on:
+#       - loki
+#
+#   grafana:
+#     image: grafana/grafana:10.0.0
+#     container_name: grafana
+#     restart: unless-stopped
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - GF_SECURITY_ADMIN_PASSWORD=admin
+#     volumes:
+#       - grafana-data:/var/lib/grafana
+#     depends_on:
+#       - loki
+#
+# volumes:
+#   grafana-data:

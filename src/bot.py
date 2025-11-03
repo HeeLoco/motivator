@@ -8,7 +8,6 @@ Refactored architecture with separated concerns:
 - Business logic isolated from presentation layer
 """
 
-import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
@@ -16,6 +15,7 @@ from .database import Database
 from .content import ContentManager
 from .smart_scheduler import SmartMessageScheduler
 from .goals import GoalManager
+from .logging_config import get_logger
 
 # Import all command handlers
 from .handlers.user_commands import UserCommandHandler
@@ -25,12 +25,7 @@ from .handlers.admin_commands import AdminCommandHandler
 from .handlers.message_handler import MessageHandler as TextMessageHandler
 from .handlers.callbacks import CallbackRouter
 
-# Enable logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class MotivatorBot:

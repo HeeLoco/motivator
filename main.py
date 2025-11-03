@@ -8,30 +8,19 @@ tracks mood and goals, and provides mental health resources.
 
 import os
 import sys
-import logging
 from dotenv import load_dotenv
 
 from src.bot import MotivatorBot
-
-def setup_logging():
-    """Setup logging configuration"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('motivator_bot.log'),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+from src.logging_config import setup_logging, get_logger
 
 def main():
     """Main function to start the bot"""
     # Load environment variables
     load_dotenv()
-    
-    # Setup logging
+
+    # Setup logging (reads LOG_LEVEL, LOG_FORMAT, LOG_FILE from env)
     setup_logging()
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
     
     # Get bot token from environment
     bot_token = os.getenv('BOT_TOKEN')
