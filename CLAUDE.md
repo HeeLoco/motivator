@@ -49,11 +49,30 @@ python main.py  # Recreates database
 
 ### Core Components
 
+The bot uses a **modular handler architecture** with clear separation of concerns:
+
+**Core Modules:**
 1. **`main.py`** - Entry point, environment setup, logging configuration
-2. **`bot.py`** - Main bot logic, Telegram handlers, user interactions
+2. **`bot.py`** - Orchestrator (152 lines) - coordinates handlers and manages application lifecycle
 3. **`database.py`** - SQLite operations, user data management, analytics
 4. **`content.py`** - Motivational content management, categorization, multi-language support
-5. **`smart_scheduler.py`** - Intelligent message scheduling with peak-time optimization, mood-based frequency adjustment
+5. **`smart_scheduler.py`** - Intelligent message scheduling with peak-time optimization
+6. **`goals.py`** - Goal templates and management logic
+
+**Handler Modules** (`src/handlers/`):
+- **`base.py`** - Base handler class with shared utilities
+- **`user_commands.py`** - User commands (/start, /help, /settings, /pause, /resume, /motivateMe)
+- **`mood_commands.py`** - Mood tracking (/mood, /stats)
+- **`goal_commands.py`** - Goal management (/goals)
+- **`admin_commands.py`** - Admin operations (/admin_*)
+- **`message_handler.py`** - Text message processing
+
+**Callback Handlers** (`src/handlers/callbacks/`):
+- **`router.py`** - Central callback routing
+- **`settings.py`** - Settings-related callbacks (language, frequency, timing)
+- **`mood.py`** - Mood selection and feedback callbacks
+- **`goals.py`** - Goal workflow callbacks
+- **`admin.py`** - Admin operation callbacks
 
 ### Key Design Patterns
 
