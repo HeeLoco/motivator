@@ -15,13 +15,12 @@ class TestUserCommandHandler:
     """Test suite for user command handlers"""
 
     @pytest.fixture
-    def handler(self, mock_database, mock_content_manager, mock_scheduler, mock_goal_manager):
+    def handler(self, mock_database, mock_content_manager, mock_scheduler):
         """Create handler instance with mocked dependencies"""
         return UserCommandHandler(
             mock_database,
             mock_content_manager,
-            mock_scheduler,
-            mock_goal_manager
+            mock_scheduler
         )
 
     async def test_start_command_new_user(self, handler, mock_update, mock_context):

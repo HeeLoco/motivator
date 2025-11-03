@@ -8,6 +8,5 @@ from .bot import MotivatorBot
 from .database import Database
 from .content import ContentManager
 from .smart_scheduler import SmartMessageScheduler
-from .goals import GoalManager
 
-__all__ = ['MotivatorBot', 'Database', 'ContentManager', 'SmartMessageScheduler', 'GoalManager']
+__all__ = ['MotivatorBot', 'Database', 'ContentManager', 'SmartMessageScheduler']

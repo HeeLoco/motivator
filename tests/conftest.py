@@ -105,13 +105,6 @@ def mock_database():
     db.get_total_mood_entries = Mock(return_value=25)
     db.get_recently_active_users = Mock(return_value=[12345])
 
-    # Goals
-    db.get_user_goals = Mock(return_value=[])
-    db.add_goal = Mock(return_value=1)
-    db.update_goal_progress = Mock(return_value=True)
-    db.complete_goal = Mock(return_value=True)
-    db.delete_goal = Mock(return_value=True)
-
     # Messages and feedback
     db.log_sent_message = Mock()
     db.add_feedback = Mock()
@@ -147,21 +140,6 @@ def mock_scheduler():
     scheduler = Mock()
     scheduler.start = Mock()
     return scheduler
-
-
-@pytest.fixture
-def mock_goal_manager():
-    """Mock goal manager"""
-    gm = Mock()
-    gm.get_categories = Mock(return_value={
-        'health': 'Health & Fitness',
-        'mindfulness': 'Mindfulness',
-        'social': 'Social Connection'
-    })
-    gm.get_templates_by_category = Mock(return_value=[])
-    gm.get_template_by_id = Mock(return_value=None)
-    gm.format_goal_display = Mock(return_value="Test Goal")
-    return gm
 
 
 @pytest.fixture

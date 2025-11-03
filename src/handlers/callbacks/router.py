@@ -9,7 +9,6 @@ from telegram.ext import ContextTypes
 
 from .settings import SettingsCallbackHandler
 from .mood import MoodCallbackHandler
-from .goals import GoalsCallbackHandler
 from .admin import AdminCallbackHandler
 
 
@@ -28,7 +27,6 @@ class CallbackRouter:
         # Initialize domain handlers
         self.settings_handler = SettingsCallbackHandler(bot_instance)
         self.mood_handler = MoodCallbackHandler(bot_instance)
-        self.goals_handler = GoalsCallbackHandler(bot_instance)
         self.admin_handler = AdminCallbackHandler(bot_instance)
 
         # Map callback data patterns to handlers
@@ -41,13 +39,6 @@ class CallbackRouter:
             'start_time_': self.settings_handler.handle_start_time_select,
             'end_time_': self.settings_handler.handle_end_time_select,
             'min_gap_': self.settings_handler.handle_min_gap_select,
-            'goal_category_': self.goals_handler.handle_goal_category,
-            'goal_template_': self.goals_handler.handle_goal_template,
-            'goal_detail_': self.goals_handler.handle_goal_detail,
-            'goal_checkin_': self.goals_handler.handle_goal_checkin,
-            'goal_complete_': self.goals_handler.handle_goal_complete,
-            'goal_delete_confirm_': self.goals_handler.handle_goal_delete_confirm,
-            'goal_delete_': self.goals_handler.handle_goal_delete,
             'admin_reset_confirm_': self.admin_handler.handle_admin_reset_confirm,
         }
 
@@ -64,12 +55,6 @@ class CallbackRouter:
             'reset_user': self.settings_handler.handle_reset_user,
             'confirm_reset': self.settings_handler.handle_confirm_reset,
             'back_to_settings': self.settings_handler.handle_back_to_settings,
-
-            # Goals
-            'add_goal': self.goals_handler.handle_add_goal,
-            'goal_custom': self.goals_handler.handle_goal_custom,
-            'view_goals': self.goals_handler.handle_view_goals,
-            'daily_checkin': self.goals_handler.handle_daily_checkin,
 
             # Admin
             'confirm_broadcast': self.admin_handler.handle_confirm_broadcast,

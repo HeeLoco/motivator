@@ -16,9 +16,8 @@ class TestBotIntegration:
     @patch('src.bot.Database')
     @patch('src.bot.ContentManager')
     @patch('src.bot.SmartMessageScheduler')
-    @patch('src.bot.GoalManager')
     @patch('src.bot.Application')
-    def test_bot_initialization(self, mock_app, mock_goal_mgr, mock_scheduler,
+    def test_bot_initialization(self, mock_app, mock_scheduler,
                                mock_content_mgr, mock_db):
         """Test bot initializes all dependencies correctly"""
         # Setup mocks
@@ -32,7 +31,6 @@ class TestBotIntegration:
         mock_db.assert_called_once()
         mock_content_mgr.assert_called_once()
         mock_scheduler.assert_called_once()
-        mock_goal_mgr.assert_called_once()
 
         # Verify bot attributes
         assert bot.bot_token == "test_token"
@@ -40,14 +38,13 @@ class TestBotIntegration:
         assert bot.db is not None
         assert bot.content_manager is not None
         assert bot.scheduler is not None
-        assert bot.goal_manager is not None
 
     @patch('src.bot.Database')
     @patch('src.bot.ContentManager')
     @patch('src.bot.SmartMessageScheduler')
-    @patch('src.bot.GoalManager')
+    
     @patch('src.bot.Application')
-    def test_all_handlers_initialized(self, mock_app, mock_goal_mgr, mock_scheduler,
+    def test_all_handlers_initialized(self, mock_app, mock_scheduler,
                                       mock_content_mgr, mock_db):
         """Test all command handlers are initialized"""
         mock_app_instance = Mock()
@@ -58,7 +55,7 @@ class TestBotIntegration:
         # Verify all handlers exist
         assert bot.user_handler is not None
         assert bot.mood_handler is not None
-        assert bot.goal_handler is not None
+        
         assert bot.admin_handler is not None
         assert bot.text_handler is not None
         assert bot.callback_router is not None
@@ -66,9 +63,9 @@ class TestBotIntegration:
     @patch('src.bot.Database')
     @patch('src.bot.ContentManager')
     @patch('src.bot.SmartMessageScheduler')
-    @patch('src.bot.GoalManager')
+    
     @patch('src.bot.Application')
-    def test_handlers_registered(self, mock_app, mock_goal_mgr, mock_scheduler,
+    def test_handlers_registered(self, mock_app, mock_scheduler,
                                  mock_content_mgr, mock_db):
         """Test all handlers are registered with the application"""
         mock_app_instance = Mock()
@@ -77,14 +74,14 @@ class TestBotIntegration:
         bot = MotivatorBot("test_token")
 
         # Verify handlers were added (add_handler should have been called multiple times)
-        assert mock_app_instance.add_handler.call_count >= 15  # At least 15 handlers
+        assert mock_app_instance.add_handler.call_count >= 14  # At least 14 handlers
 
     @patch('src.bot.Database')
     @patch('src.bot.ContentManager')
     @patch('src.bot.SmartMessageScheduler')
-    @patch('src.bot.GoalManager')
+    
     @patch('src.bot.Application')
-    def test_user_commands_registered(self, mock_app, mock_goal_mgr, mock_scheduler,
+    def test_user_commands_registered(self, mock_app, mock_scheduler,
                                      mock_content_mgr, mock_db):
         """Test user commands are registered"""
         mock_app_instance = Mock()
@@ -100,7 +97,7 @@ class TestBotIntegration:
 
         # Verify key commands were registered
         registered_commands = [str(call) for call in command_calls]
-        commands_to_check = ['start', 'help', 'settings', 'mood', 'goals', 'stats']
+        commands_to_check = ['start', 'help', 'settings', 'mood', 'stats']
 
         for cmd in commands_to_check:
             assert any(cmd in str(call) for call in registered_commands), \
@@ -109,9 +106,9 @@ class TestBotIntegration:
     @patch('src.bot.Database')
     @patch('src.bot.ContentManager')
     @patch('src.bot.SmartMessageScheduler')
-    @patch('src.bot.GoalManager')
+    
     @patch('src.bot.Application')
-    def test_admin_commands_registered(self, mock_app, mock_goal_mgr, mock_scheduler,
+    def test_admin_commands_registered(self, mock_app, mock_scheduler,
                                       mock_content_mgr, mock_db):
         """Test admin commands are registered"""
         mock_app_instance = Mock()
@@ -131,9 +128,9 @@ class TestBotIntegration:
     @patch('src.bot.Database')
     @patch('src.bot.ContentManager')
     @patch('src.bot.SmartMessageScheduler')
-    @patch('src.bot.GoalManager')
+    
     @patch('src.bot.Application')
-    def test_callback_handler_registered(self, mock_app, mock_goal_mgr, mock_scheduler,
+    def test_callback_handler_registered(self, mock_app, mock_scheduler,
                                          mock_content_mgr, mock_db):
         """Test callback query handler is registered"""
         mock_app_instance = Mock()
@@ -149,10 +146,10 @@ class TestBotIntegration:
     @patch('src.bot.Database')
     @patch('src.bot.ContentManager')
     @patch('src.bot.SmartMessageScheduler')
-    @patch('src.bot.GoalManager')
+    
     @patch('src.bot.Application')
     @pytest.mark.asyncio
-    async def test_send_motivational_message_delegates(self, mock_app, mock_goal_mgr,
+    async def test_send_motivational_message_delegates(self, mock_app,
                                                        mock_scheduler, mock_content_mgr, mock_db):
         """Test send_motivational_message delegates to admin handler"""
         mock_app_instance = Mock()
@@ -173,9 +170,9 @@ class TestBotIntegration:
     @patch('src.bot.Database')
     @patch('src.bot.ContentManager')
     @patch('src.bot.SmartMessageScheduler')
-    @patch('src.bot.GoalManager')
+    
     @patch('src.bot.Application')
-    def test_run_starts_scheduler_and_bot(self, mock_app, mock_goal_mgr, mock_scheduler,
+    def test_run_starts_scheduler_and_bot(self, mock_app, mock_scheduler,
                                          mock_content_mgr, mock_db):
         """Test run() starts both scheduler and bot polling"""
         mock_app_instance = Mock()

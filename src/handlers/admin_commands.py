@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class AdminCommandHandler(BaseHandler):
     """Handles admin-only command handlers"""
 
-    def __init__(self, db, content_manager, scheduler, goal_manager, admin_user_id, application):
+    def __init__(self, db, content_manager, scheduler, admin_user_id, application):
         """
         Initialize admin command handler.
 
@@ -34,11 +34,10 @@ class AdminCommandHandler(BaseHandler):
             db: Database instance
             content_manager: ContentManager instance
             scheduler: SmartMessageScheduler instance
-            goal_manager: GoalManager instance
             admin_user_id: Telegram user ID of admin
             application: Telegram application instance
         """
-        super().__init__(db, content_manager, scheduler, goal_manager)
+        super().__init__(db, content_manager, scheduler)
         self.admin_user_id = admin_user_id
         self.application = application
 

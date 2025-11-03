@@ -1,6 +1,6 @@
 # Motivator Bot 🤖💙
 
-A Telegram bot designed to support mental health and motivation through personalized messages, mood tracking, and goal setting. Perfect for individuals dealing with psychological challenges and their support networks.
+A Telegram bot designed to support mental health and motivation through personalized messages and mood tracking. Perfect for individuals dealing with psychological challenges and their support networks.
 
 ## Features
 
@@ -8,7 +8,6 @@ A Telegram bot designed to support mental health and motivation through personal
 - **Personalized Motivational Messages**: Random supportive messages throughout the day
 - **Bilingual Support**: English and German content
 - **Mood Tracking**: Daily mood logging with personalized responses
-- **Goal Setting**: Personal goal management and motivation
 - **Feedback System**: Learn from user reactions to improve content
 - **Media Content**: YouTube videos, support links, and motivational images
 
@@ -129,7 +128,6 @@ ADMIN_USER_ID=your_telegram_user_id_here  # Optional
 - `/help` - Show all available commands
 - `/settings` - Configure preferences
 - `/mood` - Log mood (1-10 scale)
-- `/goals` - Manage personal goals
 - `/stats` - View usage statistics
 - `/motivateMe` - Get instant motivation right now!
 - `/pause` - Temporarily stop messages
@@ -207,7 +205,6 @@ SQLite database (`motivator.db`) contains:
 - **motivational_content** - All motivational messages (NEW!)
 - **users** - User settings and preferences
 - **mood_entries** - Mood tracking data
-- **user_goals** - Personal goals
 - **sent_messages** - Message history
 - **feedback** - User feedback and analytics
 - **user_timing_preferences** - Smart scheduling settings
