@@ -28,11 +28,81 @@ class MotivationalContent:
     tags: List[str] = None
 
 class ContentManager:
-    def __init__(self):
+    def __init__(self, db=None):
+        """
+        Initialize ContentManager
+
+        Args:
+            db: Database instance (if None, will use fallback hardcoded content)
+        """
+        self.db = db
         self.content = self._load_content()
-    
+
     def _load_content(self) -> Dict[str, List[MotivationalContent]]:
-        """Load motivational content in different languages"""
+        """Load motivational content from database or fallback to hardcoded"""
+        # Try to load from database first
+        if self.db:
+            try:
+                return self._load_from_database()
+            except Exception as e:
+                import logging
+                logging.error(f"Failed to load content from database: {e}")
+                logging.warning("Falling back to hardcoded content")
+
+        # Fallback to hardcoded content
+        return self._load_hardcoded_content()
+
+    def _load_from_database(self) -> Dict[str, List[MotivationalContent]]:
+        """Load content from database"""
+        import json
+        import logging
+
+        content = {'en': [], 'de': []}
+
+        # Get all active content from database
+        db_content = self.db.get_all_content(active_only=True)
+
+        logging.info(f"Loading {len(db_content)} content items from database")
+
+        for item in db_content:
+            try:
+                # Convert database row to MotivationalContent object
+                tags = None
+                if item['tags']:
+                    try:
+                        tags = json.loads(item['tags'])
+                    except:
+                        tags = None
+
+                content_obj = MotivationalContent(
+                    id=item['id'],
+                    content=item['content'],
+                    content_type=ContentType(item['content_type']),
+                    language=item['language'],
+                    category=MoodCategory(item['category']),
+                    media_url=item['media_url'],
+                    tags=tags
+                )
+
+                # Add to appropriate language list
+                if content_obj.language in content:
+                    content[content_obj.language].append(content_obj)
+                else:
+                    content[content_obj.language] = [content_obj]
+
+            except Exception as e:
+                logging.error(f"Error loading content item {item.get('id')}: {e}")
+
+        logging.info(f"Loaded content by language: {
+{lang: len(items) for lang, items in content.items()}}")
+
+        return content
+
+    def _load_hardcoded_content(self) -> Dict[str, List[MotivationalContent]]:
+        """
+        FALLBACK: Hardcoded content (kept for emergencies)
+        This is only used if database loading fails
+        """
         content = {
             'en': [],
             'de': []
@@ -172,7 +242,87 @@ class ContentManager:
         self.content[language].append(content)
     
     def remove_content(self, content_id: int) -> bool:
-        """Remove content by ID"""
-        for language in self.content:
-            self.content[language] = [c for c in self.content[language] if c.id != content_id]
-        return True
+        """Remove content by ID (from database and memory)"""
+        import logging
+
+        # If database is available, delete from database
+        if self.db:
+            try:
+                success = self.db.delete_content(content_id)
+                if success:
+                    # Also remove from memory
+                    for language in self.content:
+                        self.content[language] = [c for c in self.content[language] if c.id != content_id]
+                    logging.info(f"Removed content ID {content_id} from database and memory")
+                    return True
+                else:
+                    logging.warning(f"Failed to remove content ID {content_id} from database")
+                    return False
+            except Exception as e:
+                logging.error(f"Error removing content from database: {e}")
+                return False
+        else:
+            # Fallback: remove from memory only (hardcoded mode)
+            for language in self.content:
+                self.content[language] = [c for c in self.content[language] if c.id != content_id]
+            logging.warning("Removed content from memory only (no database connection)")
+            return True
+
+    def add_content_to_db(self, content: str, content_type: str, language: str,
+                         category: str, media_url: str = None, tags: str = None) -> bool:
+        """
+        Add new content to database
+
+        Args:
+            content: The motivational message text
+            content_type: 'text', 'image', 'video', or 'link'
+            language: 'en' or 'de'
+            category: 'anxiety', 'depression', 'stress', 'motivation', 'self_care', 'general'
+            media_url: Optional URL for media content
+            tags: Optional JSON string of tags
+
+        Returns:
+            bool: True if added successfully
+        """
+        import logging
+
+        if not self.db:
+            logging.error("Cannot add content: No database connection")
+            return False
+
+        try:
+            content_id = self.db.add_content(
+                content=content,
+                content_type=content_type,
+                language=language,
+                category=category,
+                media_url=media_url,
+                tags=tags
+            )
+
+            if content_id:
+                # Also add to memory for immediate availability
+                content_obj = MotivationalContent(
+                    id=content_id,
+                    content=content,
+                    content_type=ContentType(content_type),
+                    language=language,
+                    category=MoodCategory(category),
+                    media_url=media_url,
+                    tags=None if not tags else tags
+                )
+
+                if language in self.content:
+                    self.content[language].append(content_obj)
+                else:
+                    self.content[language] = [content_obj]
+
+                logging.info(f"Added new content to database and memory: ID {content_id}")
+                return True
+            else:
+                logging.error("Failed to add content to database")
+                return False
+
+        except Exception as e:
+            logging.error(f"Error adding content to database: {e}")
+            return False
