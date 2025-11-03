@@ -1,12 +1,15 @@
 import random
 import asyncio
+import uuid
 from datetime import datetime, timedelta, time
 from typing import List, Dict, Any, Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+
+from .logging_config import get_logger, log_with_context, set_correlation_id, clear_correlation_id
 import logging
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class SmartMessageScheduler:
     def __init__(self, database, content_manager):
@@ -223,12 +226,24 @@ class SmartMessageScheduler:
     
     async def _send_tracked_message(self, user_id: int, scheduled_time: str):
         """Send message and track engagement"""
+        # Generate correlation ID for this message send operation
+        correlation_id = f"msg_{user_id}_{uuid.uuid4().hex[:8]}"
+        set_correlation_id(correlation_id)
+
         try:
             actual_send_time = datetime.now().isoformat()
-            
+
+            log_with_context(
+                logger, logging.INFO,
+                "Sending scheduled message",
+                user_id=user_id,
+                scheduled_time=scheduled_time,
+                actual_send_time=actual_send_time
+            )
+
             # Send the motivational message
             await self.bot.send_motivational_message(user_id)
-            
+
             # Log the engagement (basic tracking)
             self.db.log_message_engagement(
                 user_id=user_id,
@@ -236,9 +251,23 @@ class SmartMessageScheduler:
                 actual_send_time=actual_send_time,
                 message_type='motivational'
             )
-            
+
+            log_with_context(
+                logger, logging.INFO,
+                "Message sent successfully",
+                user_id=user_id,
+                message_type='motivational'
+            )
+
         except Exception as e:
-            logger.error(f"Error sending tracked message to user {user_id}: {e}")
+            log_with_context(
+                logger, logging.ERROR,
+                f"Error sending tracked message: {e}",
+                user_id=user_id,
+                error=str(e)
+            )
+        finally:
+            clear_correlation_id()
     
     async def _plan_daily_messages(self):
         """Plan next day's messages for optimal distribution (future enhancement)"""
