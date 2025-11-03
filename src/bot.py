@@ -26,7 +26,7 @@ class MotivatorBot:
         self.bot_token = bot_token
         self.admin_user_id = admin_user_id
         self.db = Database()
-        self.content_manager = ContentManager()
+        self.content_manager = ContentManager(self.db)  # Pass database for content loading
         self.goal_manager = GoalManager()
         self.scheduler = SmartMessageScheduler(self.db, self.content_manager)
         
@@ -1431,27 +1431,60 @@ This will be sent to ALL users. Continue?
         help_text = """
 ➕ *Adding New Content*
 
-To add content, use the content manager directly or modify `content.py`.
+Content is now stored in the database. You have three ways to add content:
 
-**Content structure:**
-• ID: Auto-assigned
-• Content: The motivational text
-• Type: TEXT, IMAGE, VIDEO, LINK  
-• Language: 'en' or 'de'
-• Category: ANXIETY, DEPRESSION, STRESS, MOTIVATION, SELF_CARE, GENERAL
-• Media URL: Optional link for videos/images
+**Method 1: Direct Database Access**
+```python
+from src.database import Database
+from src.content import ContentManager
+
+db = Database()
+db.add_content(
+    content="Your motivational message here",
+    content_type="text",
+    language="en",
+    category="motivation"
+)
+```
+
+**Method 2: Using ContentManager**
+```python
+content_manager.add_content_to_db(
+    content="Your message",
+    content_type="text",
+    language="en",
+    category="motivation",
+    media_url=None  # Optional
+)
+```
+
+**Method 3: Import from JSON**
+Use the import script:
+```bash
+python scripts/migrate_content_to_db.py
+```
+
+**Content Types:**
+• `text` - Text messages
+• `image` - Image with caption
+• `video` - Video content (YouTube shorts)
+• `link` - External links
+
+**Languages:**
+• `en` - English
+• `de` - German (Deutsch)
 
 **Categories:**
-• `ANXIETY` - For anxiety support
-• `DEPRESSION` - For depression support  
-• `STRESS` - For stress management
-• `MOTIVATION` - General motivation
-• `SELF_CARE` - Self-care reminders
-• `GENERAL` - General mental health
+• `anxiety` - Anxiety support
+• `depression` - Depression support
+• `stress` - Stress management
+• `motivation` - General motivation
+• `self_care` - Self-care reminders
+• `general` - General mental health
 
-**Note:** Dynamic content addition via bot commands will be implemented in future updates. Currently, modify `content.py` directly.
+All content is immediately available after adding!
 """
-        
+
         # Safety check for message object
         if update.message:
             await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)

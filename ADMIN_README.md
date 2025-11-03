@@ -157,7 +157,7 @@ List all users or get detailed information about specific users.
 
 ## 4. `/admin_content` - Content Management
 
-Manage the bot's motivational content including viewing, statistics, and removal.
+Manage the bot's motivational content stored in the database. All content is dynamically loaded from SQLite and can be added, viewed, or removed without restarting the bot.
 
 ### Usage
 ```bash
@@ -185,8 +185,55 @@ Manage the bot's motivational content including viewing, statistics, and removal
 ```bash
 /admin_content list de          # Show German content
 /admin_content remove 15        # Remove content ID 15
-/admin_content stats           # Show content statistics
+/admin_content stats            # Show content statistics
+/admin_content add              # Show how to add content
 ```
+
+### Adding New Content
+
+Content is stored in the database (`motivator.db`) in the `motivational_content` table. You have several methods to add content:
+
+#### Method 1: Direct Database Access (Recommended)
+```python
+from src.database import Database
+
+db = Database()
+content_id = db.add_content(
+    content="Your motivational message here",
+    content_type="text",        # text, image, video, link
+    language="en",               # en or de
+    category="motivation",       # anxiety, depression, stress, motivation, self_care, general
+    media_url=None               # Optional: URL for videos/images/links
+)
+print(f"Added content with ID: {content_id}")
+```
+
+#### Method 2: Using ContentManager
+```python
+from src.database import Database
+from src.content import ContentManager
+
+db = Database()
+content_manager = ContentManager(db)
+
+success = content_manager.add_content_to_db(
+    content="Your motivational message",
+    content_type="text",
+    language="de",
+    category="self_care",
+    media_url=None  # Optional
+)
+```
+
+#### Method 3: Direct SQL Insert
+```sql
+sqlite3 motivator.db
+
+INSERT INTO motivational_content (content, content_type, language, category, active)
+VALUES ('Your message here', 'text', 'en', 'motivation', 1);
+```
+
+**Note:** Content is immediately available after adding - no bot restart needed!
 
 ### Content List Display
 ```
@@ -344,9 +391,6 @@ Admin operations are logged with INFO level:
 ```bash
 # View logs
 tail -f motivator_bot.log
-
-# Or with systemd
-journalctl -u motivator-bot -f
 ```
 
 ---
@@ -374,7 +418,6 @@ For issues with admin commands:
 
 **Log Locations:**
 - Application logs: `motivator_bot.log`
-- System logs: `journalctl -u motivator-bot`
 
 **Smart Scheduling Logs:**
 Look for entries containing:

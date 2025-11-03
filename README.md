@@ -68,7 +68,6 @@ deactivate              # Stop working
 ### 1. Prerequisites
 - Python 3.8+
 - Telegram Bot Token (from @BotFather)
-- Raspberry Pi (recommended) or any Linux/macOS/Windows system
 
 ### 2. Installation
 
@@ -138,34 +137,98 @@ ADMIN_USER_ID=your_telegram_user_id_here  # Optional
 
 ## Content Management
 
+All motivational content is now stored in the SQLite database (`motivator.db`), making it easy to add, edit, and manage content without modifying code.
+
 ### Adding Custom Content
-Content can be managed by editing `content.py` or directly through the database:
 
+#### Method 1: Direct Database Access (Recommended)
 ```python
-# Example: Adding new motivational content
-from content import ContentManager, MotivationalContent, ContentType, MoodCategory
+from src.database import Database
 
-content_manager = ContentManager()
-new_content = MotivationalContent(
-    id=0,  # Will be auto-assigned
-    content="Your custom motivational message",
-    content_type=ContentType.TEXT,
-    language='en',
-    category=MoodCategory.MOTIVATION
+db = Database()
+db.add_content(
+    content="Your custom motivational message here",
+    content_type="text",      # text, image, video, link
+    language="en",             # en or de
+    category="motivation",     # anxiety, depression, stress, motivation, self_care, general
+    media_url=None             # Optional: URL for videos/images
 )
-content_manager.add_custom_content(new_content)
 ```
+
+#### Method 2: Using ContentManager
+```python
+from src.database import Database
+from src.content import ContentManager
+
+db = Database()
+content_manager = ContentManager(db)
+
+content_manager.add_content_to_db(
+    content="Your motivational message",
+    content_type="text",
+    language="en",
+    category="motivation",
+    media_url=None  # Optional
+)
+```
+
+#### Method 3: Admin Bot Commands
+Administrators can manage content directly through bot commands:
+- `/admin_content list` - View all content
+- `/admin_content list en` - View English content only
+- `/admin_content add` - Get help on adding content
+- `/admin_content remove <id>` - Remove content by ID
+- `/admin_content stats` - View content statistics
+
+#### Method 4: Import from JSON
+Use the migration script to bulk import content:
+```bash
+python scripts/migrate_content_to_db.py
+```
+
+### Content Categories
+
+- **anxiety** - Support for anxiety management
+- **depression** - Support for depression
+- **stress** - Stress relief and management
+- **motivation** - General motivational messages
+- **self_care** - Self-care reminders and tips
+- **general** - General mental health support
+
+### Content Types
+
+- **text** - Plain text messages
+- **image** - Image with caption
+- **video** - Video content (e.g., YouTube shorts)
+- **link** - External resource links
 
 ### Database Access
 SQLite database (`motivator.db`) contains:
-- User settings and preferences
-- Sent message history
-- Mood tracking data
-- Feedback and analytics
-- Personal goals
+- **motivational_content** - All motivational messages (NEW!)
+- **users** - User settings and preferences
+- **mood_entries** - Mood tracking data
+- **user_goals** - Personal goals
+- **sent_messages** - Message history
+- **feedback** - User feedback and analytics
+- **user_timing_preferences** - Smart scheduling settings
 
 Query examples:
 ```sql
+-- View all active content
+SELECT * FROM motivational_content WHERE active = 1;
+
+-- View content by language
+SELECT * FROM motivational_content WHERE language = 'en' AND active = 1;
+
+-- View content by category
+SELECT * FROM motivational_content WHERE category = 'motivation' AND active = 1;
+
+-- Get content statistics
+SELECT language, category, COUNT(*)
+FROM motivational_content
+WHERE active = 1
+GROUP BY language, category;
+
 -- View user statistics
 SELECT * FROM users;
 
@@ -174,71 +237,6 @@ SELECT * FROM mood_entries WHERE user_id = 123 ORDER BY created_at DESC;
 
 -- Analyze message effectiveness
 SELECT feedback_type, COUNT(*) FROM feedback GROUP BY feedback_type;
-```
-
-## Deployment on Raspberry Pi
-
-### 1. System Setup
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install Python dependencies
-sudo apt install python3-pip python3-venv -y
-
-# Navigate to project directory
-cd /home/pi/motivator
-
-# Create virtual environment
-python3 -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate
-
-# Upgrade pip and install dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# Setup environment file
-cp .env.example .env
-nano .env  # Add your bot token
-```
-
-### 2. Auto-start Service
-Create `/etc/systemd/system/motivator-bot.service`:
-
-```ini
-[Unit]
-Description=Motivator Telegram Bot
-After=network.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/motivator
-Environment=PATH=/home/pi/motivator/venv/bin
-ExecStart=/home/pi/motivator/venv/bin/python main.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-```bash
-sudo systemctl enable motivator-bot
-sudo systemctl start motivator-bot
-sudo systemctl status motivator-bot
-```
-
-### 3. Monitoring
-```bash
-# View logs
-sudo journalctl -u motivator-bot -f
-
-# Check bot status
-sudo systemctl status motivator-bot
 ```
 
 ## Architecture
@@ -281,7 +279,7 @@ The bot supports group chats for beta testing:
 
 - No personal data shared with third parties
 - Local SQLite database (not cloud-based)
-- Mood and message data stored locally on your Raspberry Pi
+- Mood and message data stored locally on your system
 - Optional data export for personal analysis
 - User can delete their data anytime
 

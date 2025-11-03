@@ -122,7 +122,34 @@ class Database:
                     FOREIGN KEY (user_id) REFERENCES users (user_id)
                 )
             """)
-            
+
+            # Motivational content table for database-driven content management
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS motivational_content (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    content TEXT NOT NULL,
+                    content_type TEXT NOT NULL,
+                    language TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    media_url TEXT,
+                    tags TEXT,
+                    active BOOLEAN DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Create indexes for efficient content queries
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_content_language_category
+                ON motivational_content(language, category, active)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_content_active
+                ON motivational_content(active)
+            """)
+
             conn.commit()
             logging.info("Database initialized successfully")
 
@@ -762,3 +789,202 @@ class Database:
         except Exception as e:
             logging.error(f"Error getting detailed message stats: {e}")
             return []
+
+    # ==================== Content Management Methods ====================
+
+    def add_content(self, content: str, content_type: str, language: str,
+                   category: str, media_url: str = None, tags: str = None) -> Optional[int]:
+        """Add new motivational content to database"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO motivational_content
+                    (content, content_type, language, category, media_url, tags, active)
+                    VALUES (?, ?, ?, ?, ?, ?, 1)
+                """, (content, content_type, language, category, media_url, tags))
+                conn.commit()
+                logging.info(f"Added content: {content[:50]}... (ID: {cursor.lastrowid})")
+                return cursor.lastrowid
+        except Exception as e:
+            logging.error(f"Error adding content: {e}")
+            return None
+
+    def get_all_content(self, language: str = None, category: str = None,
+                       active_only: bool = True) -> List[Dict[str, Any]]:
+        """Get all motivational content, optionally filtered"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                query = "SELECT * FROM motivational_content WHERE 1=1"
+                params = []
+
+                if active_only:
+                    query += " AND active = 1"
+                if language:
+                    query += " AND language = ?"
+                    params.append(language)
+                if category:
+                    query += " AND category = ?"
+                    params.append(category)
+
+                query += " ORDER BY created_at DESC"
+
+                cursor.execute(query, params)
+                results = cursor.fetchall()
+
+                return [{
+                    'id': r[0],
+                    'content': r[1],
+                    'content_type': r[2],
+                    'language': r[3],
+                    'category': r[4],
+                    'media_url': r[5],
+                    'tags': r[6],
+                    'active': r[7],
+                    'created_at': r[8],
+                    'updated_at': r[9]
+                } for r in results]
+
+        except Exception as e:
+            logging.error(f"Error getting content: {e}")
+            return []
+
+    def get_content_by_criteria(self, language: str, category: str = None) -> List[Dict[str, Any]]:
+        """Get content matching specific criteria (used by ContentManager)"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                if category:
+                    cursor.execute("""
+                        SELECT id, content, content_type, language, category, media_url, tags
+                        FROM motivational_content
+                        WHERE language = ? AND category = ? AND active = 1
+                        ORDER BY RANDOM()
+                    """, (language, category))
+                else:
+                    cursor.execute("""
+                        SELECT id, content, content_type, language, category, media_url, tags
+                        FROM motivational_content
+                        WHERE language = ? AND active = 1
+                        ORDER BY RANDOM()
+                    """, (language,))
+
+                results = cursor.fetchall()
+
+                return [{
+                    'id': r[0],
+                    'content': r[1],
+                    'content_type': r[2],
+                    'language': r[3],
+                    'category': r[4],
+                    'media_url': r[5],
+                    'tags': r[6]
+                } for r in results]
+
+        except Exception as e:
+            logging.error(f"Error getting content by criteria: {e}")
+            return []
+
+    def update_content(self, content_id: int, **kwargs) -> bool:
+        """Update existing content"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                allowed_fields = ['content', 'content_type', 'language', 'category',
+                                'media_url', 'tags', 'active']
+                updates = []
+                values = []
+
+                for key, value in kwargs.items():
+                    if key in allowed_fields:
+                        updates.append(f"{key} = ?")
+                        values.append(value)
+
+                if not updates:
+                    return False
+
+                # Add updated_at timestamp
+                updates.append("updated_at = CURRENT_TIMESTAMP")
+                values.append(content_id)
+
+                query = f"UPDATE motivational_content SET {', '.join(updates)} WHERE id = ?"
+                cursor.execute(query, values)
+                conn.commit()
+
+                logging.info(f"Updated content ID {content_id}")
+                return cursor.rowcount > 0
+
+        except Exception as e:
+            logging.error(f"Error updating content: {e}")
+            return False
+
+    def delete_content(self, content_id: int) -> bool:
+        """Delete content (soft delete by setting active=0)"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE motivational_content
+                    SET active = 0, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (content_id,))
+                conn.commit()
+
+                logging.info(f"Deactivated content ID {content_id}")
+                return cursor.rowcount > 0
+
+        except Exception as e:
+            logging.error(f"Error deleting content: {e}")
+            return False
+
+    def get_content_stats(self) -> Dict[str, Any]:
+        """Get statistics about content in database"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # Total count
+                cursor.execute("SELECT COUNT(*) FROM motivational_content WHERE active = 1")
+                total = cursor.fetchone()[0]
+
+                # By language
+                cursor.execute("""
+                    SELECT language, COUNT(*)
+                    FROM motivational_content
+                    WHERE active = 1
+                    GROUP BY language
+                """)
+                by_language = {row[0]: row[1] for row in cursor.fetchall()}
+
+                # By category
+                cursor.execute("""
+                    SELECT category, COUNT(*)
+                    FROM motivational_content
+                    WHERE active = 1
+                    GROUP BY category
+                """)
+                by_category = {row[0]: row[1] for row in cursor.fetchall()}
+
+                # By type
+                cursor.execute("""
+                    SELECT content_type, COUNT(*)
+                    FROM motivational_content
+                    WHERE active = 1
+                    GROUP BY content_type
+                """)
+                by_type = {row[0]: row[1] for row in cursor.fetchall()}
+
+                return {
+                    'total': total,
+                    'by_language': by_language,
+                    'by_category': by_category,
+                    'by_type': by_type
+                }
+
+        except Exception as e:
+            logging.error(f"Error getting content stats: {e}")
+            return {}

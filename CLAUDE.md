@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Motivator Bot is a Telegram bot designed for mental health support and motivation. It sends personalized motivational messages, tracks user mood, manages goals, and provides mental health resources. The bot is designed to run on a Raspberry Pi and supports bilingual content (English/German).
+Motivator Bot is a Telegram bot designed for mental health support and motivation. It sends personalized motivational messages, tracks user mood, manages goals, and provides mental health resources. The bot supports bilingual content (English/German).
 
 **Purpose**: Support individuals with psychological challenges through automated motivational messaging, mood tracking, and goal management.
 
@@ -142,11 +142,10 @@ new_content = MotivationalContent(
 
 ## Deployment Notes
 
-### Raspberry Pi Deployment
-- Use systemd service for auto-start
+### General Deployment
 - Virtual environment recommended
 - SQLite database requires write permissions
-- Log monitoring via `journalctl -u motivator-bot -f`
+- Monitor logs in `motivator_bot.log`
 
 ### Security Considerations
 - No sensitive data in code - use environment variables
