@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Motivator Bot is a Telegram bot designed for mental health support and motivation. It sends personalized motivational messages, tracks user mood, manages goals, and provides mental health resources. The bot supports bilingual content (English/German).
+Motivator Bot is a Telegram bot designed for mental health support and motivation. It sends personalized motivational messages, tracks user mood, and provides mental health resources. The bot supports bilingual content (English/German).
 
-**Purpose**: Support individuals with psychological challenges through automated motivational messaging, mood tracking, and goal management.
+**Purpose**: Support individuals with psychological challenges through automated motivational messaging and mood tracking.
 
 ## Development Commands
 
@@ -73,13 +73,11 @@ The bot uses a **modular handler architecture** with clear separation of concern
 4. **`database.py`** - SQLite operations, user data management, analytics
 5. **`content.py`** - Motivational content management, categorization, multi-language support
 6. **`smart_scheduler.py`** - Intelligent message scheduling with peak-time optimization
-7. **`goals.py`** - Goal templates and management logic
 
 **Handler Modules** (`src/handlers/`):
 - **`base.py`** - Base handler class with shared utilities
 - **`user_commands.py`** - User commands (/start, /help, /settings, /pause, /resume, /motivateMe)
 - **`mood_commands.py`** - Mood tracking (/mood, /stats)
-- **`goal_commands.py`** - Goal management (/goals)
 - **`admin_commands.py`** - Admin operations (/admin_*)
 - **`message_handler.py`** - Text message processing
 
@@ -87,19 +85,17 @@ The bot uses a **modular handler architecture** with clear separation of concern
 - **`router.py`** - Central callback routing
 - **`settings.py`** - Settings-related callbacks (language, frequency, timing)
 - **`mood.py`** - Mood selection and feedback callbacks
-- **`goals.py`** - Goal workflow callbacks
 - **`admin.py`** - Admin operation callbacks
 
 ### Key Design Patterns
 
-**Database Schema**: 
+**Database Schema**:
 - `users` - User settings, preferences, activity status
 - `user_timing_preferences` - Smart scheduling settings (active hours, peak times, minimum gaps)
 - `message_schedule_log` - Engagement tracking for learning optimal send times
 - `sent_messages` - Message tracking for analytics
 - `feedback` - User feedback on message effectiveness
 - `mood_entries` - Mood tracking (1-10 scale)
-- `user_goals` - Personal goal management
 
 **Content Management**:
 - Enum-based categorization (MoodCategory: ANXIETY, DEPRESSION, STRESS, MOTIVATION, SELF_CARE, GENERAL)
@@ -368,8 +364,8 @@ The bot also maintains separate database logging for analytics:
 1. **Advanced Timing Features**: Calendar integration, timezone detection, sleep schedule awareness
 2. **Enhanced Personalization**: Machine learning for content selection based on engagement patterns
 3. **Advanced Scheduling**: Weekly patterns, holiday awareness, context-aware timing
-4. **Crisis Detection**: Keyword monitoring for emergency situations  
-5. **Group Features**: Collaborative goal setting, group challenges
+4. **Crisis Detection**: Keyword monitoring for emergency situations
+5. **Group Features**: Group challenges, shared motivational content
 6. **Analytics Dashboard**: Web interface for usage statistics and timing analytics
 7. **Content Management**: Admin interface for non-technical content updates
 8. **Integration**: Calendar apps, fitness trackers, other mental health tools

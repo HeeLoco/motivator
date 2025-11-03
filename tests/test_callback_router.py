@@ -16,13 +16,12 @@ class TestCallbackRouter:
     """Test suite for callback routing"""
 
     @pytest.fixture
-    def mock_bot_instance(self, mock_database, mock_content_manager, mock_scheduler, mock_goal_manager):
+    def mock_bot_instance(self, mock_database, mock_content_manager, mock_scheduler):
         """Create a mock bot instance with all dependencies"""
         bot = Mock()
         bot.db = mock_database
         bot.content_manager = mock_content_manager
         bot.scheduler = mock_scheduler
-        bot.goal_manager = mock_goal_manager
         bot.admin_user_id = None
         bot.application = Mock()
         return bot
@@ -73,15 +72,6 @@ class TestCallbackRouter:
 
         update.callback_query.answer.assert_called_once()
 
-    async def test_route_goal_category_prefix(self, router):
-        """Test routing for goal_category_ prefix"""
-        update = MockUpdate(callback_data="goal_category_health")
-        context = MockContext()
-
-        await router.route(update, context)
-
-        update.callback_query.answer.assert_called_once()
-
     async def test_route_exact_match_close_menu(self, router):
         """Test exact match routing for close_menu"""
         update = MockUpdate(callback_data="close_menu")
@@ -113,17 +103,6 @@ class TestCallbackRouter:
         update.callback_query.edit_message_text.assert_called_once()
         call_args = update.callback_query.edit_message_text.call_args
         assert "Unknown action" in call_args[0][0]
-
-    async def test_route_prefix_priority(self, router):
-        """Test that more specific prefixes are matched first"""
-        # goal_delete_confirm_ should match before goal_delete_
-        update = MockUpdate(callback_data="goal_delete_confirm_5")
-        context = MockContext()
-
-        await router.route(update, context)
-
-        # Should not raise error - confirms correct handler was called
-        update.callback_query.answer.assert_called_once()
 
     async def test_close_menu_handler(self, router):
         """Test _handle_close_menu deletes message"""

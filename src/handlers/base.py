@@ -10,7 +10,7 @@ from typing import Optional
 class BaseHandler:
     """Base class for command handlers with shared utilities"""
 
-    def __init__(self, db, content_manager, scheduler, goal_manager):
+    def __init__(self, db, content_manager, scheduler):
         """
         Initialize base handler with shared dependencies.
 
@@ -18,12 +18,10 @@ class BaseHandler:
             db: Database instance
             content_manager: ContentManager instance
             scheduler: SmartMessageScheduler instance
-            goal_manager: GoalManager instance
         """
         self.db = db
         self.content_manager = content_manager
         self.scheduler = scheduler
-        self.goal_manager = goal_manager
 
     def get_user_language(self, user_id: int) -> str:
         """

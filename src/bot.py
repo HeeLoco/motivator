@@ -14,13 +14,11 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 from .database import Database
 from .content import ContentManager
 from .smart_scheduler import SmartMessageScheduler
-from .goals import GoalManager
 from .logging_config import get_logger
 
 # Import all command handlers
 from .handlers.user_commands import UserCommandHandler
 from .handlers.mood_commands import MoodCommandHandler
-from .handlers.goal_commands import GoalCommandHandler
 from .handlers.admin_commands import AdminCommandHandler
 from .handlers.message_handler import MessageHandler as TextMessageHandler
 from .handlers.callbacks import CallbackRouter
@@ -45,7 +43,6 @@ class MotivatorBot:
         # Initialize core dependencies
         self.db = Database()
         self.content_manager = ContentManager(self.db)
-        self.goal_manager = GoalManager()
         self.scheduler = SmartMessageScheduler(self.db, self.content_manager)
 
         # Create Telegram application
@@ -55,29 +52,19 @@ class MotivatorBot:
         self.user_handler = UserCommandHandler(
             self.db,
             self.content_manager,
-            self.scheduler,
-            self.goal_manager
+            self.scheduler
         )
 
         self.mood_handler = MoodCommandHandler(
             self.db,
             self.content_manager,
-            self.scheduler,
-            self.goal_manager
-        )
-
-        self.goal_handler = GoalCommandHandler(
-            self.db,
-            self.content_manager,
-            self.scheduler,
-            self.goal_manager
+            self.scheduler
         )
 
         self.admin_handler = AdminCommandHandler(
             self.db,
             self.content_manager,
             self.scheduler,
-            self.goal_manager,
             self.admin_user_id,
             self.application
         )
@@ -85,8 +72,7 @@ class MotivatorBot:
         self.text_handler = TextMessageHandler(
             self.db,
             self.content_manager,
-            self.scheduler,
-            self.goal_manager
+            self.scheduler
         )
 
         # Initialize callback router
@@ -109,9 +95,6 @@ class MotivatorBot:
         # Mood commands
         self.application.add_handler(CommandHandler("mood", self.mood_handler.mood_check))
         self.application.add_handler(CommandHandler("stats", self.mood_handler.stats))
-
-        # Goal commands
-        self.application.add_handler(CommandHandler("goals", self.goal_handler.goals))
 
         # Admin commands
         self.application.add_handler(CommandHandler("admin_stats", self.admin_handler.admin_stats))

@@ -32,15 +32,11 @@ try:
     from src.content import ContentManager
     print("   ✓ content module imported successfully")
 
-    print("\n5. Testing goals module import...")
-    from src.goals import GoalManager
-    print("   ✓ goals module imported successfully")
-
-    print("\n6. Testing smart_scheduler module import...")
+    print("\n5. Testing smart_scheduler module import...")
     from src.smart_scheduler import SmartMessageScheduler
     print("   ✓ smart_scheduler module imported successfully")
 
-    print("\n7. Testing bot module import...")
+    print("\n6. Testing bot module import...")
     from src.bot import MotivatorBot
     print("   ✓ bot module imported successfully")
 

@@ -37,14 +37,13 @@ Ich bin hier, um dich mit personalisierten motivierenden Nachrichten den ganzen 
 
 *Was ich kann:*
 • Dir motivierende Nachrichten zu zufälligen Zeiten senden
-• Dir beim Verfolgen deiner Stimmung und Ziele helfen
+• Dir beim Verfolgen deiner Stimmung helfen
 • Unterstützungsressourcen bereitstellen, wenn du sie brauchst
 • Nachrichten basierend auf deinem Feedback anpassen
 
 *Schnelle Einrichtung:*
 /settings - Deine Einstellungen konfigurieren
 /mood - Verfolge, wie du dich heute fühlst
-/goals - Setze persönliche Ziele für Motivation
 
 *Befehle:*
 /help - Alle verfügbaren Befehle anzeigen
@@ -82,7 +81,6 @@ Welche Sprache bevorzugst du?
 /start - Bot starten und einrichten
 /settings - Einstellungen anpassen
 /mood - Stimmung eingeben (1-10)
-/goals - Ziele verwalten
 /stats - Deine Statistiken anzeigen
 /motivateMe - Sofortige Motivation erhalten!
 /pause - Nachrichten pausieren
@@ -94,7 +92,6 @@ Welche Sprache bevorzugst du?
 • Verfolge deine Stimmung und Fortschritte
 • Stelle deine Nachrichtenhäufigkeit ein
 • Gib Feedback zu Nachrichten
-• Setze und verfolge persönliche Ziele
 
 *Feedback geben:*
 Antworte einfach auf meine Nachrichten mit:
@@ -112,7 +109,6 @@ Ich bin hier, um dich zu unterstützen! 💙
 /start - Start and setup the bot
 /settings - Adjust your preferences
 /mood - Log your mood (1-10 scale)
-/goals - Manage your personal goals
 /stats - View your statistics
 /motivateMe - Get instant motivation right now!
 /pause - Pause motivational messages
@@ -124,7 +120,6 @@ Ich bin hier, um dich zu unterstützen! 💙
 • Track your mood and progress over time
 • Customize message frequency and timing
 • Give feedback on messages I send
-• Set and track personal goals
 
 *Giving Feedback:*
 Simply reply to my messages with:

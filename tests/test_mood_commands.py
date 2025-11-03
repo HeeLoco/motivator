@@ -14,13 +14,12 @@ class TestMoodCommandHandler:
     """Test suite for mood command handlers"""
 
     @pytest.fixture
-    def handler(self, mock_database, mock_content_manager, mock_scheduler, mock_goal_manager):
+    def handler(self, mock_database, mock_content_manager, mock_scheduler):
         """Create handler instance with mocked dependencies"""
         return MoodCommandHandler(
             mock_database,
             mock_content_manager,
-            mock_scheduler,
-            mock_goal_manager
+            mock_scheduler
         )
 
     async def test_mood_check_german(self, handler, mock_update, mock_context):
