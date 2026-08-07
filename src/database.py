@@ -618,6 +618,28 @@ class Database:
             logger.error(f"Error getting AI usage stats: {e}")
             return []
 
+    def get_user_ai_usage(self, user_id: int, days: int = 30) -> List[Dict]:
+        """Aggregate one user's AI token usage of the last N days by use case"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT use_case, COUNT(*), SUM(input_tokens), SUM(output_tokens)
+                    FROM ai_usage
+                    WHERE user_id = ? AND created_at >= datetime('now', ?)
+                    GROUP BY use_case
+                    ORDER BY SUM(input_tokens) + SUM(output_tokens) DESC
+                """, (user_id, f'-{days} days'))
+                return [{
+                    'use_case': r[0],
+                    'requests': r[1],
+                    'input_tokens': r[2] or 0,
+                    'output_tokens': r[3] or 0
+                } for r in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error getting user AI usage: {e}")
+            return []
+
     def cleanup_old_chat_messages(self, days: int = 30) -> int:
         """Delete summarized raw chat messages older than N days (data minimization)"""
         try:

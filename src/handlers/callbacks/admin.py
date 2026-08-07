@@ -6,6 +6,7 @@ Handles admin-related callback queries:
 - User reset confirmation/cancellation
 """
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from src.logging_config import get_logger
@@ -131,3 +132,30 @@ The user can now start fresh with default settings."""
     async def handle_admin_reset_cancel(self, query, context):
         """Cancel admin user reset operation"""
         await query.edit_message_text("❌ User data reset cancelled.")
+
+    async def handle_admin_user_detail(self, query, context):
+        """Show the detail view for a user tapped in the interactive list"""
+        if self.admin_user_id is None or query.from_user.id != self.admin_user_id:
+            await query.edit_message_text("❌ Admin access required.")
+            return
+
+        target_user_id = int(query.data.split("_")[-1])
+        user_text = self.bot.admin_handler.build_user_detail(target_user_id)
+
+        if user_text is None:
+            await query.edit_message_text(f"❌ User {target_user_id} not found.")
+            return
+
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("⬅️ Back to list", callback_data="admin_users_list")
+        ]])
+        await query.edit_message_text(user_text, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+    async def handle_admin_users_list(self, query, context):
+        """Return to the interactive user list"""
+        if self.admin_user_id is None or query.from_user.id != self.admin_user_id:
+            await query.edit_message_text("❌ Admin access required.")
+            return
+
+        text, reply_markup = self.bot.admin_handler.build_users_list()
+        await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)

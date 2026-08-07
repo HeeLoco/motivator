@@ -172,36 +172,40 @@ This will be sent to ALL users. Continue?
                 reply_markup=reply_markup
         )
 
-    @admin_only
-    async def admin_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Show list of all users or detailed info for specific user - only for admin users"""
-        try:
-            # Check if specific user ID was provided
-            if context.args:
-                # Show detailed info for specific user
-                try:
-                    target_user_id = int(context.args[0])
-                except ValueError:
-                    await update.message.reply_text("❌ Invalid user ID. Please provide a numeric user ID.")
-                    return
+    def build_user_detail(self, target_user_id: int):
+        """
+        Build the detail view text for one user, or None if unknown.
 
-                # Get detailed user info
-                user_details = self.db.get_user_detailed_info(target_user_id)
+        Shared by the /admin_users command and the interactive user list.
+        """
+        user_details = self.db.get_user_detailed_info(target_user_id)
+        if not user_details:
+            return None
 
-                if not user_details:
-                    await update.message.reply_text(f"❌ User `{target_user_id}` not found in database.", parse_mode=ParseMode.MARKDOWN)
-                    return
+        # Get additional statistics for this user
+        mood_entries = self.db.get_recent_mood(target_user_id, 30)  # Last 30 days
+        message_stats = self.db.get_message_stats(target_user_id)
+        total_messages = sum(message_stats.values())
 
-                # Get additional statistics for this user
-                mood_entries = self.db.get_recent_mood(target_user_id, 30)  # Last 30 days
-                message_stats = self.db.get_message_stats(target_user_id)
-                total_messages = sum(message_stats.values())
+        # Calculate average mood
+        avg_mood = (sum(m['score'] for m in mood_entries) / len(mood_entries)) if mood_entries else None
 
-                # Calculate average mood
-                avg_mood = (sum(m['score'] for m in mood_entries) / len(mood_entries)) if mood_entries else None
+        # AI token usage of the last 30 days
+        ai_usage = self.db.get_user_ai_usage(target_user_id, 30)
+        if ai_usage:
+            total_in = sum(u['input_tokens'] for u in ai_usage)
+            total_out = sum(u['output_tokens'] for u in ai_usage)
+            usage_lines = "\n".join(
+                f"• {u['use_case']}: {u['requests']} req, "
+                f"{u['input_tokens']:,} in / {u['output_tokens']:,} out"
+                for u in ai_usage
+            )
+            ai_text = (f"\n🤖 **AI usage (30d):** {total_in:,} in / {total_out:,} out tokens\n"
+                       f"{usage_lines}\n")
+        else:
+            ai_text = "\n🤖 **AI usage (30d):** none\n"
 
-                # Format detailed user info
-                user_text = f"""
+        return f"""
 👤 *Detailed User Information*
 
 🆔 **User ID:** `{user_details['user_id']}`
@@ -224,47 +228,56 @@ This will be sent to ALL users. Continue?
 • Text: {message_stats.get('text', 0)}
 • Media: {message_stats.get('image', 0) + message_stats.get('video', 0)}
 • Links: {message_stats.get('link', 0)}
-"""
+{ai_text}"""
 
-                await self._reply(update, user_text, parse_mode=ParseMode.MARKDOWN)
+    def build_users_list(self):
+        """
+        Build the interactive user list: header text plus one button per
+        user that opens the detail view. Returns (text, reply_markup).
+        """
+        users_info = self.db.get_all_users_detailed()
+        if not users_info:
+            return "📝 No users found in database.", None
 
-            else:
-                # Show list of all users (original functionality)
-                users_info = self.db.get_all_users_detailed()
+        text = (f"👥 *All Registered Users* ({len(users_info)})\n\n"
+                "Tap a user for details (incl. AI token usage):")
 
-                if not users_info:
-                    await update.message.reply_text("📝 No users found in database.")
+        keyboard = []
+        for user in users_info[:50]:  # Telegram keyboard size limit
+            active = "✅" if user['active'] else "⏸️"
+            name = user['first_name'] or user['username'] or str(user['user_id'])
+            username = f" (@{user['username']})" if user['username'] else ""
+            keyboard.append([InlineKeyboardButton(
+                f"{active} {name}{username}",
+                callback_data=f"admin_user_{user['user_id']}"
+            )])
+        if len(users_info) > 50:
+            text += f"\n\n(showing first 50 of {len(users_info)})"
+
+        return text, InlineKeyboardMarkup(keyboard)
+
+    @admin_only
+    async def admin_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show interactive user list or detailed info for specific user"""
+        try:
+            if context.args:
+                # Direct detail view via /admin_users <user_id>
+                try:
+                    target_user_id = int(context.args[0])
+                except ValueError:
+                    await self._reply(update, "❌ Invalid user ID. Please provide a numeric user ID.")
                     return
 
-                # Format user list with usage help
-                users_text = f"""👥 *All Registered Users*
+                user_text = self.build_user_detail(target_user_id)
+                if user_text is None:
+                    await self._reply(update, f"❌ User `{target_user_id}` not found in database.", parse_mode=ParseMode.MARKDOWN)
+                    return
 
-💡 *Tip:* Use `/admin_users <user_id>` for detailed info
-
-"""
-
-                for i, user in enumerate(users_info, 1):
-                    user_id_str = user['user_id']
-                    username = user['username'] or "No username"
-                    first_name = user['first_name'] or "No name"
-                    language = user['language']
-                    frequency = user['message_frequency']
-                    active = "✅" if user['active'] else "⏸️"
-                    last_active = user['last_active'][:10] if user['last_active'] else "Never"
-
-                    users_text += f"""
-*{i}.* `{user_id_str}`
-📛 {first_name} (@{username})
-🌍 {language} | 📊 {frequency}/day | {active}
-🕒 Last: {last_active}
-"""
-
-                    # Telegram has message length limits, break into chunks if needed
-                    if len(users_text) > 3500:  # Leave room for more text
-                        users_text += f"\n... and {len(users_info) - i} more users"
-                        break
-
-                await self._reply(update, users_text, parse_mode=ParseMode.MARKDOWN)
+                await self._reply(update, user_text, parse_mode=ParseMode.MARKDOWN)
+            else:
+                # Interactive list with one button per user
+                text, reply_markup = self.build_users_list()
+                await self._reply(update, text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
 
         except Exception as e:
             logger.error(f"Error in admin_users: {e}")

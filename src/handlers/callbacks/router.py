@@ -40,6 +40,7 @@ class CallbackRouter:
             'end_time_': self.settings_handler.handle_end_time_select,
             'min_gap_': self.settings_handler.handle_min_gap_select,
             'admin_reset_confirm_': self.admin_handler.handle_admin_reset_confirm,
+            'admin_user_': self.admin_handler.handle_admin_user_detail,
         }
 
         # Exact match handlers
@@ -64,6 +65,7 @@ class CallbackRouter:
             'confirm_broadcast': self.admin_handler.handle_confirm_broadcast,
             'cancel_broadcast': self.admin_handler.handle_cancel_broadcast,
             'admin_reset_cancel': self.admin_handler.handle_admin_reset_cancel,
+            'admin_users_list': self.admin_handler.handle_admin_users_list,
 
             # Utility
             'close_menu': self._handle_close_menu,
