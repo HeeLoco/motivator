@@ -4,7 +4,16 @@ Message handler for Motivator Bot.
 Handles non-command text messages:
 - Simple feedback detection
 - AI-powered conversational replies (with static fallback)
+
+Conversation memory is database-backed: every turn is stored in
+chat_messages, older turns get folded into a rolling summary
+(chat_summaries), and long-lived knowledge about the user is kept
+as facts (user_facts). The AI context per reply is:
+summary + user facts + the recent verbatim turns.
 """
+
+import asyncio
+import logging
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -13,12 +22,16 @@ from telegram.constants import ChatAction
 from .base import BaseHandler
 from src import ai_motivator
 
+logger = logging.getLogger(__name__)
+
 
 class MessageHandler(BaseHandler):
     """Handles non-command text message processing"""
 
-    # Maximum conversation turns (user + assistant entries) kept per chat
-    MAX_HISTORY_ENTRIES = 20
+    # When more unsummarized turns than this accumulate, consolidate
+    SUMMARIZE_THRESHOLD = 20
+    # How many recent turns stay verbatim after consolidation
+    KEEP_VERBATIM = 8
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle regular text messages and feedback"""
@@ -44,25 +57,33 @@ class MessageHandler(BaseHandler):
             await update.message.reply_text(response)
         else:
             # Regular message - answer conversationally via AI
+            chat_id = update.effective_chat.id
             user_settings = self.db.get_user_settings(user_id)
             language = user_settings.get('language', 'de') if user_settings else 'de'
 
             recent_mood = self.db.get_recent_mood(user_id, 1)
             mood_score = recent_mood[0]['score'] if recent_mood else None
 
-            history = context.chat_data.setdefault('ai_history', [])
+            summary = self.db.get_chat_summary(user_id, chat_id)
+            facts = self.db.get_user_facts(user_id)
+            history = [
+                {'role': m['role'], 'content': m['content']}
+                for m in self.db.get_unsummarized_messages(user_id, chat_id)
+            ]
 
             await update.message.chat.send_action(ChatAction.TYPING)
             response = await ai_motivator.generate_chat_reply(
                 language, update.message.text, mood_score, history,
-                update.effective_user.first_name
+                update.effective_user.first_name, facts, summary
             )
 
             if response:
-                # Remember this exchange for follow-up messages
-                history.append({'role': 'user', 'content': update.message.text})
-                history.append({'role': 'assistant', 'content': response})
-                del history[:-self.MAX_HISTORY_ENTRIES]
+                # Persist this exchange for follow-up messages
+                self.db.add_chat_message(user_id, chat_id, 'user', update.message.text)
+                self.db.add_chat_message(user_id, chat_id, 'assistant', response)
+
+                # Consolidate memory in the background (summary + facts)
+                asyncio.create_task(self._maintain_memory(user_id, chat_id, language))
             else:
                 # Static fallback when AI is unavailable
                 if language == 'de':
@@ -71,3 +92,38 @@ class MessageHandler(BaseHandler):
                     response = "I received your message! Use /help to see all available commands."
 
             await update.message.reply_text(response)
+
+    async def _maintain_memory(self, user_id: int, chat_id: int, language: str):
+        """
+        Fold older turns into the rolling summary and refresh user facts
+        once enough unsummarized messages accumulated.
+
+        Runs as a background task after replying so the user never waits
+        for memory maintenance.
+        """
+        try:
+            messages = self.db.get_unsummarized_messages(user_id, chat_id)
+            if len(messages) <= self.SUMMARIZE_THRESHOLD:
+                return
+
+            to_fold = messages[:-self.KEEP_VERBATIM]
+
+            old_summary = self.db.get_chat_summary(user_id, chat_id)
+            new_summary = await ai_motivator.summarize_conversation(
+                language, old_summary, to_fold
+            )
+            if new_summary:
+                self.db.save_chat_summary(user_id, chat_id, new_summary)
+                self.db.mark_messages_summarized([m['id'] for m in to_fold])
+                logger.info(f"Folded {len(to_fold)} messages into summary for user {user_id}")
+
+            existing_facts = self.db.get_user_facts(user_id)
+            new_facts = await ai_motivator.extract_user_facts(
+                language, existing_facts, to_fold
+            )
+            if new_facts is not None:
+                self.db.replace_user_facts(user_id, new_facts)
+                logger.info(f"Updated facts for user {user_id}: {len(new_facts)} facts")
+
+        except Exception as e:
+            logger.error(f"Error maintaining chat memory for user {user_id}: {e}")

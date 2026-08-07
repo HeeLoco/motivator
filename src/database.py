@@ -135,6 +135,47 @@ class Database:
                 ON motivational_content(active)
             """)
 
+            # AI chat history (raw conversation turns)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    chat_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    summarized BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_user
+                ON chat_messages(user_id, chat_id, summarized)
+            """)
+
+            # Rolling AI conversation summary per user+chat
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_summaries (
+                    user_id INTEGER NOT NULL,
+                    chat_id INTEGER NOT NULL,
+                    summary TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, chat_id)
+                )
+            """)
+
+            # Long-term user facts extracted by the AI
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    fact TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            """)
+
             conn.commit()
             logging.info("Database initialized successfully")
 
@@ -345,7 +386,12 @@ class Database:
                 
                 # Delete all user's sent message history
                 cursor.execute("DELETE FROM sent_messages WHERE user_id = ?", (user_id,))
-                
+
+                # Delete AI chat memory (history, summary, facts)
+                cursor.execute("DELETE FROM chat_messages WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM chat_summaries WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM user_facts WHERE user_id = ?", (user_id,))
+
                 conn.commit()
                 logging.info(f"Reset all data for user {user_id}")
                 return True
@@ -353,6 +399,153 @@ class Database:
         except Exception as e:
             logging.error(f"Error resetting user data: {e}")
             return False
+
+    # --- AI chat memory (history, rolling summary, user facts) ---
+
+    def add_chat_message(self, user_id: int, chat_id: int, role: str, content: str) -> bool:
+        """Store one conversation turn ('user' or 'assistant')"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO chat_messages (user_id, chat_id, role, content)
+                    VALUES (?, ?, ?, ?)
+                """, (user_id, chat_id, role, content))
+                conn.commit()
+                return True
+        except Exception as e:
+            logging.error(f"Error adding chat message: {e}")
+            return False
+
+    def get_unsummarized_messages(self, user_id: int, chat_id: int) -> List[Dict]:
+        """Get all not-yet-summarized turns, oldest first"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, role, content FROM chat_messages
+                    WHERE user_id = ? AND chat_id = ? AND summarized = 0
+                    ORDER BY id ASC
+                """, (user_id, chat_id))
+                return [{'id': r[0], 'role': r[1], 'content': r[2]}
+                        for r in cursor.fetchall()]
+        except Exception as e:
+            logging.error(f"Error getting chat messages: {e}")
+            return []
+
+    def mark_messages_summarized(self, message_ids: List[int]) -> bool:
+        """Flag turns as folded into the rolling summary"""
+        if not message_ids:
+            return True
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                placeholders = ','.join('?' * len(message_ids))
+                cursor.execute(
+                    f"UPDATE chat_messages SET summarized = 1 WHERE id IN ({placeholders})",
+                    message_ids
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logging.error(f"Error marking messages summarized: {e}")
+            return False
+
+    def get_chat_summary(self, user_id: int, chat_id: int) -> Optional[str]:
+        """Get the rolling conversation summary, if any"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT summary FROM chat_summaries
+                    WHERE user_id = ? AND chat_id = ?
+                """, (user_id, chat_id))
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            logging.error(f"Error getting chat summary: {e}")
+            return None
+
+    def save_chat_summary(self, user_id: int, chat_id: int, summary: str) -> bool:
+        """Insert or replace the rolling conversation summary"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO chat_summaries (user_id, chat_id, summary, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(user_id, chat_id)
+                    DO UPDATE SET summary = excluded.summary, updated_at = excluded.updated_at
+                """, (user_id, chat_id, summary, datetime.now()))
+                conn.commit()
+                return True
+        except Exception as e:
+            logging.error(f"Error saving chat summary: {e}")
+            return False
+
+    def get_user_facts(self, user_id: int) -> List[str]:
+        """Get long-term facts the AI has learned about the user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT fact FROM user_facts
+                    WHERE user_id = ? ORDER BY id ASC
+                """, (user_id,))
+                return [r[0] for r in cursor.fetchall()]
+        except Exception as e:
+            logging.error(f"Error getting user facts: {e}")
+            return []
+
+    def replace_user_facts(self, user_id: int, facts: List[str]) -> bool:
+        """Replace the user's fact list with an updated version"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM user_facts WHERE user_id = ?", (user_id,))
+                cursor.executemany(
+                    "INSERT INTO user_facts (user_id, fact) VALUES (?, ?)",
+                    [(user_id, fact) for fact in facts]
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logging.error(f"Error replacing user facts: {e}")
+            return False
+
+    def delete_chat_memory(self, user_id: int) -> bool:
+        """Delete all AI chat memory for a user (history, summaries, facts)"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM chat_messages WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM chat_summaries WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM user_facts WHERE user_id = ?", (user_id,))
+                conn.commit()
+                logging.info(f"Deleted chat memory for user {user_id}")
+                return True
+        except Exception as e:
+            logging.error(f"Error deleting chat memory: {e}")
+            return False
+
+    def cleanup_old_chat_messages(self, days: int = 30) -> int:
+        """Delete summarized raw chat messages older than N days (data minimization)"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    DELETE FROM chat_messages
+                    WHERE summarized = 1
+                    AND created_at < datetime('now', ?)
+                """, (f'-{days} days',))
+                deleted = cursor.rowcount
+                conn.commit()
+                if deleted:
+                    logging.info(f"Cleaned up {deleted} old chat messages")
+                return deleted
+        except Exception as e:
+            logging.error(f"Error cleaning up chat messages: {e}")
+            return 0
 
     def get_all_users(self) -> List[int]:
         """Get list of all user IDs (active and inactive)"""

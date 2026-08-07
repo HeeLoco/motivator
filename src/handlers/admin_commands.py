@@ -612,7 +612,8 @@ Are you sure you want to proceed?"""
 
         # Try AI-generated motivation first, fall back to static content
         ai_text = await ai_motivator.generate_motivation(
-            language, mood_score, user_settings.get('first_name')
+            language, mood_score, user_settings.get('first_name'),
+            self.db.get_user_facts(user_id)
         )
         if ai_text:
             try:

@@ -86,6 +86,7 @@ Welche Sprache bevorzugst du?
 /motivateMe - Sofortige Motivation erhalten!
 /pause - Nachrichten pausieren
 /resume - Nachrichten wieder aktivieren
+/forgetme - Gesprächsgedächtnis der AI löschen
 /help - Diese Hilfe anzeigen
 
 *Funktionen:*
@@ -114,6 +115,7 @@ Ich bin hier, um dich zu unterstützen! 💙
 /motivateMe - Get instant motivation right now!
 /pause - Pause motivational messages
 /resume - Resume receiving messages
+/forgetme - Delete the AI's conversation memory
 /help - Show this help message
 
 *Features:*
@@ -220,6 +222,32 @@ What would you like to change?
 
         await update.message.reply_text(text)
 
+    async def forget_me(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Delete the user's AI chat memory (history, summary, facts)"""
+        user_id = update.effective_user.id
+        language = self.get_user_language(user_id)
+
+        success = self.db.delete_chat_memory(user_id)
+
+        if language == 'de':
+            if success:
+                text = ("🗑️ Erledigt! Ich habe unseren Gesprächsverlauf, die Zusammenfassung "
+                        "und alles, was ich mir über dich gemerkt hatte, gelöscht.\n\n"
+                        "Deine Einstellungen und Stimmungseinträge bleiben erhalten — "
+                        "die kannst du über /settings → Zurücksetzen löschen.")
+            else:
+                text = "❌ Beim Löschen ist etwas schiefgegangen. Versuche es später nochmal."
+        else:
+            if success:
+                text = ("🗑️ Done! I deleted our conversation history, the summary, "
+                        "and everything I had remembered about you.\n\n"
+                        "Your settings and mood entries are kept — you can delete "
+                        "those via /settings → Reset.")
+            else:
+                text = "❌ Something went wrong while deleting. Please try again later."
+
+        await update.message.reply_text(text)
+
     async def _send_feedback_buttons(self, update: Update, language: str, message_id: int):
         """Send instant-feedback buttons referencing a just-sent message"""
         keyboard = [
@@ -254,7 +282,8 @@ What would you like to change?
 
         # Try AI-generated motivation first, fall back to static content
         ai_text = await ai_motivator.generate_motivation(
-            language, mood_score, update.effective_user.first_name
+            language, mood_score, update.effective_user.first_name,
+            self.db.get_user_facts(user_id)
         )
         if ai_text:
             try:

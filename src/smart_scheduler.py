@@ -42,6 +42,14 @@ class SmartMessageScheduler:
             trigger=CronTrigger(hour=20, minute=0),
             id='daily_mood_reminder'
         )
+
+        # Daily chat memory cleanup (3 AM) - data minimization:
+        # delete raw chat messages that are already summarized and >30 days old
+        self.scheduler.add_job(
+            func=self._cleanup_chat_memory,
+            trigger=CronTrigger(hour=3, minute=0),
+            id='daily_chat_cleanup'
+        )
         
         self.scheduler.start()
         logger.info("Smart message scheduler started")
@@ -310,6 +318,13 @@ class SmartMessageScheduler:
         except Exception as e:
             logger.error(f"Error in mood reminders: {e}")
     
+    async def _cleanup_chat_memory(self):
+        """Delete old, already-summarized raw chat messages (data minimization)"""
+        try:
+            self.db.cleanup_old_chat_messages(days=30)
+        except Exception as e:
+            logger.error(f"Error in chat memory cleanup: {e}")
+
     def stop(self):
         """Stop the scheduler"""
         self.scheduler.shutdown()

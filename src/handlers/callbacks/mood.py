@@ -39,7 +39,8 @@ class MoodCallbackHandler:
 
         # Try an individual AI reaction first, fall back to static content
         ai_reaction = await ai_motivator.generate_mood_reaction(
-            language, mood_score, query.from_user.first_name
+            language, mood_score, query.from_user.first_name,
+            self.db.get_user_facts(user_id)
         )
 
         if ai_reaction:

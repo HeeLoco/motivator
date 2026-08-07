@@ -91,6 +91,7 @@ class MotivatorBot:
         self.application.add_handler(CommandHandler("pause", self.user_handler.pause_messages))
         self.application.add_handler(CommandHandler("resume", self.user_handler.resume_messages))
         self.application.add_handler(CommandHandler("motivateMe", self.user_handler.motivate_me))
+        self.application.add_handler(CommandHandler("forgetme", self.user_handler.forget_me))
 
         # Mood commands
         self.application.add_handler(CommandHandler("mood", self.mood_handler.mood_check))
