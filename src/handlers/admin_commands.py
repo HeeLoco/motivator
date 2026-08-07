@@ -83,6 +83,26 @@ class AdminCommandHandler(BaseHandler):
             # Get recent activity (users active in last 7 days)
             recent_active = self.db.get_recently_active_users(7)
 
+            # AI token usage of the last 30 days, grouped by use case
+            ai_usage = self.db.get_ai_usage_stats(30)
+            if ai_usage:
+                total_in = sum(u['input_tokens'] for u in ai_usage)
+                total_out = sum(u['output_tokens'] for u in ai_usage)
+                total_requests = sum(u['requests'] for u in ai_usage)
+                usage_lines = "\n".join(
+                    f"• {u['use_case']}: {u['requests']} req, "
+                    f"{u['input_tokens']:,} in / {u['output_tokens']:,} out"
+                    for u in ai_usage
+                )
+                ai_usage_text = (
+                    f"\n🤖 *AI usage (30 days):*\n"
+                    f"• Total: {total_requests} requests, "
+                    f"{total_in:,} in / {total_out:,} out tokens\n"
+                    f"{usage_lines}\n"
+                )
+            else:
+                ai_usage_text = "\n🤖 *AI usage (30 days):* no requests recorded\n"
+
             stats_text = f"""
 📊 *Admin Statistics Dashboard*
 
@@ -101,7 +121,7 @@ class AdminCommandHandler(BaseHandler):
 📈 *Engagement:*
 • Total mood entries: {total_mood_entries}
 • Avg messages per user: {total_messages / total_users if total_users > 0 else 0:.1f}
-"""
+{ai_usage_text}"""
 
             await update.message.reply_text(stats_text, parse_mode=ParseMode.MARKDOWN)
 
@@ -563,7 +583,7 @@ Are you sure you want to proceed?"""
         # Try AI-generated motivation first, fall back to static content
         ai_text = await ai_motivator.generate_motivation(
             language, mood_score, user_settings.get('first_name'),
-            self.db.get_user_facts(user_id)
+            self.db.get_user_facts(user_id), user_id=user_id
         )
         if ai_text:
             try:

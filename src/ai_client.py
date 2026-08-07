@@ -13,7 +13,7 @@ callers should fall back to static content.
 """
 
 import os
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from openai import AsyncOpenAI
 
@@ -22,6 +22,16 @@ from src.logging_config import get_logger
 logger = get_logger(__name__)
 
 _client: Optional[AsyncOpenAI] = None
+
+# Optional callback (user_id, use_case, input_tokens, output_tokens) invoked
+# after each successful request; wired to Database.log_ai_usage at bot startup.
+_usage_recorder: Optional[Callable[[Optional[int], str, int, int], None]] = None
+
+
+def set_usage_recorder(recorder: Callable[[Optional[int], str, int, int], None]):
+    """Register a callback that records token usage of each AI request."""
+    global _usage_recorder
+    _usage_recorder = recorder
 
 
 def is_configured() -> bool:
@@ -44,13 +54,16 @@ def _get_client() -> AsyncOpenAI:
 
 
 async def generate_response(prompt: str, instructions: Optional[str] = None,
-                            history: Optional[List[Dict[str, str]]] = None) -> Optional[str]:
+                            history: Optional[List[Dict[str, str]]] = None,
+                            user_id: Optional[int] = None,
+                            use_case: str = 'other') -> Optional[str]:
     """
     Generate a text response for the given prompt.
 
     history is an optional list of prior conversation turns, each a dict
     with 'role' ('user' or 'assistant') and 'content'. The prompt is
-    appended as the newest user turn.
+    appended as the newest user turn. user_id and use_case are passed to
+    the registered usage recorder for token accounting.
 
     Returns the model's text output, or None if the AI is not configured
     or the request fails. Callers must handle the None case with a fallback.
@@ -70,8 +83,28 @@ async def generate_response(prompt: str, instructions: Optional[str] = None,
             instructions=instructions,
             input=model_input,
         )
+
+        _record_usage(response, user_id, use_case)
+
         text = response.output_text
         return text.strip() if text else None
     except Exception as e:
         logger.error(f"AI request failed: {e}")
         return None
+
+
+def _record_usage(response, user_id: Optional[int], use_case: str):
+    """Pass the request's token usage to the registered recorder, if any."""
+    if _usage_recorder is None:
+        return
+    usage = getattr(response, 'usage', None)
+    if usage is None:
+        return
+    try:
+        _usage_recorder(
+            user_id, use_case,
+            getattr(usage, 'input_tokens', 0) or 0,
+            getattr(usage, 'output_tokens', 0) or 0,
+        )
+    except Exception as e:
+        logger.error(f"Error recording AI usage: {e}")

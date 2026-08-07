@@ -75,7 +75,8 @@ class MessageHandler(BaseHandler):
             await update.message.chat.send_action(ChatAction.TYPING)
             response = await ai_motivator.generate_chat_reply(
                 language, update.message.text, mood_score, history,
-                update.effective_user.first_name, facts, summary
+                update.effective_user.first_name, facts, summary,
+                user_id=user_id
             )
 
             if response:
@@ -111,7 +112,7 @@ class MessageHandler(BaseHandler):
 
             old_summary = self.db.get_chat_summary(user_id, chat_id)
             new_summary = await ai_motivator.summarize_conversation(
-                language, old_summary, to_fold
+                language, old_summary, to_fold, user_id=user_id
             )
             if new_summary:
                 self.db.save_chat_summary(user_id, chat_id, new_summary)
@@ -120,7 +121,7 @@ class MessageHandler(BaseHandler):
 
             existing_facts = self.db.get_user_facts(user_id)
             new_facts = await ai_motivator.extract_user_facts(
-                language, existing_facts, to_fold
+                language, existing_facts, to_fold, user_id=user_id
             )
             if new_facts is not None:
                 self.db.replace_user_facts(user_id, new_facts)

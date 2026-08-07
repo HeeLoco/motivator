@@ -89,7 +89,8 @@ def _mood_context(language: str, mood_score: Optional[int]) -> str:
 
 async def generate_motivation(language: str, mood_score: Optional[int] = None,
                               first_name: Optional[str] = None,
-                              facts: Optional[List[str]] = None) -> Optional[str]:
+                              facts: Optional[List[str]] = None,
+                              user_id: Optional[int] = None) -> Optional[str]:
     """Generate a personalized motivational message."""
     context = (
         f"{_name_context(language, first_name)}"
@@ -107,7 +108,8 @@ async def generate_motivation(language: str, mood_score: Optional[int] = None,
             "Write a short, personal motivational message that fits the mood."
         )
 
-    return await generate_response(prompt, instructions=_instructions(language))
+    return await generate_response(prompt, instructions=_instructions(language),
+                                   user_id=user_id, use_case='motivation')
 
 
 def _chat_instructions(language: str, mood_score: Optional[int],
@@ -148,7 +150,8 @@ async def generate_chat_reply(language: str, user_message: str,
                               history: Optional[List[Dict[str, str]]] = None,
                               first_name: Optional[str] = None,
                               facts: Optional[List[str]] = None,
-                              summary: Optional[str] = None) -> Optional[str]:
+                              summary: Optional[str] = None,
+                              user_id: Optional[int] = None) -> Optional[str]:
     """
     Generate an empathetic reply to a free-text message from the user.
 
@@ -160,12 +163,14 @@ async def generate_chat_reply(language: str, user_message: str,
         user_message,
         instructions=_chat_instructions(language, mood_score, first_name, facts, summary),
         history=history,
+        user_id=user_id, use_case='chat',
     )
 
 
 async def generate_mood_reaction(language: str, mood_score: int,
                                  first_name: Optional[str] = None,
-                                 facts: Optional[List[str]] = None) -> Optional[str]:
+                                 facts: Optional[List[str]] = None,
+                                 user_id: Optional[int] = None) -> Optional[str]:
     """Generate an individual reaction to a fresh mood entry."""
     if language == 'de':
         prompt = (
@@ -186,7 +191,8 @@ async def generate_mood_reaction(language: str, mood_score: int,
             "reinforce for high moods."
         )
 
-    return await generate_response(prompt, instructions=_instructions(language))
+    return await generate_response(prompt, instructions=_instructions(language),
+                                   user_id=user_id, use_case='mood_reaction')
 
 
 def _format_transcript(messages: List[Dict[str, str]]) -> str:
@@ -194,7 +200,8 @@ def _format_transcript(messages: List[Dict[str, str]]) -> str:
 
 
 async def summarize_conversation(language: str, old_summary: Optional[str],
-                                 messages: List[Dict[str, str]]) -> Optional[str]:
+                                 messages: List[Dict[str, str]],
+                                 user_id: Optional[int] = None) -> Optional[str]:
     """
     Fold older conversation turns into the rolling summary.
 
@@ -232,11 +239,13 @@ async def summarize_conversation(language: str, old_summary: Optional[str],
             "Produce the updated overall summary."
         )
 
-    return await generate_response(prompt, instructions=instructions)
+    return await generate_response(prompt, instructions=instructions,
+                                   user_id=user_id, use_case='summary')
 
 
 async def extract_user_facts(language: str, existing_facts: List[str],
-                             messages: List[Dict[str, str]]) -> Optional[List[str]]:
+                             messages: List[Dict[str, str]],
+                             user_id: Optional[int] = None) -> Optional[List[str]]:
     """
     Update the long-term fact list about the user from recent conversation.
 
@@ -277,7 +286,8 @@ async def extract_user_facts(language: str, existing_facts: List[str],
             "Output the updated fact list."
         )
 
-    response = await generate_response(prompt, instructions=instructions)
+    response = await generate_response(prompt, instructions=instructions,
+                                       user_id=user_id, use_case='facts')
     if response is None:
         return None
 

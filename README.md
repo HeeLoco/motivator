@@ -197,6 +197,7 @@ SQLite (`motivator.db`), created automatically on first run.
 | `chat_messages` | Raw AI conversation turns (`user`/`assistant`), flagged once summarized |
 | `chat_summaries` | Rolling conversation summary, one row per user+chat |
 | `user_facts` | Long-term facts the AI learned about the user (max 15) |
+| `ai_usage` | Token accounting per AI request: use case, input/output tokens |
 
 Useful queries:
 ```sql

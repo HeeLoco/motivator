@@ -15,6 +15,7 @@ from .database import Database
 from .content import ContentManager
 from .smart_scheduler import SmartMessageScheduler
 from .logging_config import get_logger
+from . import ai_client
 
 # Import all command handlers
 from .handlers.user_commands import UserCommandHandler
@@ -44,6 +45,9 @@ class MotivatorBot:
         self.db = Database()
         self.content_manager = ContentManager(self.db)
         self.scheduler = SmartMessageScheduler(self.db, self.content_manager)
+
+        # Record token usage of every AI request in the database
+        ai_client.set_usage_recorder(self.db.log_ai_usage)
 
         # Create Telegram application
         self.application = Application.builder().token(bot_token).build()

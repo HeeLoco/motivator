@@ -181,6 +181,23 @@ class Database:
                 )
             """)
 
+            # AI token usage accounting per request
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ai_usage (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    use_case TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_usage_created
+                ON ai_usage(created_at)
+            """)
+
             self._run_migrations(cursor)
 
             conn.commit()
@@ -413,10 +430,11 @@ class Database:
                 # Delete all user's sent message history
                 cursor.execute("DELETE FROM sent_messages WHERE user_id = ?", (user_id,))
 
-                # Delete AI chat memory (history, summary, facts)
+                # Delete AI chat memory (history, summary, facts) and usage accounting
                 cursor.execute("DELETE FROM chat_messages WHERE user_id = ?", (user_id,))
                 cursor.execute("DELETE FROM chat_summaries WHERE user_id = ?", (user_id,))
                 cursor.execute("DELETE FROM user_facts WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM ai_usage WHERE user_id = ?", (user_id,))
 
                 conn.commit()
                 logger.info(f"Reset all data for user {user_id}")
@@ -553,6 +571,44 @@ class Database:
         except Exception as e:
             logger.error(f"Error deleting chat memory: {e}")
             return False
+
+    def log_ai_usage(self, user_id: Optional[int], use_case: str,
+                     input_tokens: int, output_tokens: int) -> bool:
+        """Record token usage of one AI request"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO ai_usage (user_id, use_case, input_tokens, output_tokens)
+                    VALUES (?, ?, ?, ?)
+                """, (user_id, use_case, input_tokens, output_tokens))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error logging AI usage: {e}")
+            return False
+
+    def get_ai_usage_stats(self, days: int = 30) -> List[Dict]:
+        """Aggregate AI token usage of the last N days, grouped by use case"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT use_case, COUNT(*), SUM(input_tokens), SUM(output_tokens)
+                    FROM ai_usage
+                    WHERE created_at >= datetime('now', ?)
+                    GROUP BY use_case
+                    ORDER BY SUM(input_tokens) + SUM(output_tokens) DESC
+                """, (f'-{days} days',))
+                return [{
+                    'use_case': r[0],
+                    'requests': r[1],
+                    'input_tokens': r[2] or 0,
+                    'output_tokens': r[3] or 0
+                } for r in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error getting AI usage stats: {e}")
+            return []
 
     def cleanup_old_chat_messages(self, days: int = 30) -> int:
         """Delete summarized raw chat messages older than N days (data minimization)"""

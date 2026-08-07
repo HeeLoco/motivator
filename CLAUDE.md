@@ -98,6 +98,7 @@ The bot uses a **modular handler architecture** with clear separation of concern
 - `chat_messages` - Raw AI conversation turns (user/assistant), flagged once summarized
 - `chat_summaries` - Rolling AI conversation summary per user+chat
 - `user_facts` - Long-term facts the AI learned about the user (max 15)
+- `ai_usage` - Token accounting per AI request (use case, input/output tokens); shown in /admin_stats
 
 **AI Integration & Conversation Memory**:
 - All AI paths fall back to static ContentManager content when the AI is unavailable

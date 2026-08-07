@@ -238,7 +238,7 @@ I'm here to support you! 💙
         # Try AI-generated motivation first, fall back to static content
         ai_text = await ai_motivator.generate_motivation(
             language, mood_score, update.effective_user.first_name,
-            self.db.get_user_facts(user_id)
+            self.db.get_user_facts(user_id), user_id=user_id
         )
         if ai_text:
             try:
