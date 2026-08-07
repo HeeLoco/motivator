@@ -64,6 +64,17 @@ class MockContext:
 
 # Fixtures
 
+@pytest.fixture(autouse=True)
+def disable_ai(monkeypatch):
+    """
+    Disable real AI calls in all tests: generate_response returns None,
+    so every handler exercises its deterministic static-content fallback.
+    """
+    async def _no_ai(*args, **kwargs):
+        return None
+    monkeypatch.setattr('src.ai_motivator.generate_response', _no_ai)
+
+
 @pytest.fixture
 def mock_database():
     """Mock database with common methods"""
@@ -109,6 +120,17 @@ def mock_database():
     db.log_sent_message = Mock()
     db.add_feedback = Mock()
     db.get_recent_sent_content_ids = Mock(return_value=[])
+
+    # AI chat memory
+    db.get_user_facts = Mock(return_value=[])
+    db.add_chat_message = Mock(return_value=True)
+    db.get_unsummarized_messages = Mock(return_value=[])
+    db.mark_messages_summarized = Mock(return_value=True)
+    db.get_chat_summary = Mock(return_value=None)
+    db.save_chat_summary = Mock(return_value=True)
+    db.replace_user_facts = Mock(return_value=True)
+    db.delete_chat_memory = Mock(return_value=True)
+    db.cleanup_old_chat_messages = Mock(return_value=0)
 
     return db
 
