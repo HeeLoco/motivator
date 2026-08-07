@@ -159,3 +159,12 @@ The user can now start fresh with default settings."""
 
         text, reply_markup = self.bot.admin_handler.build_users_list()
         await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+
+    async def handle_admin_users_overview(self, query, context):
+        """Switch to the classic text overview of all users"""
+        if self.admin_user_id is None or query.from_user.id != self.admin_user_id:
+            await query.edit_message_text("❌ Admin access required.")
+            return
+
+        text, reply_markup = self.bot.admin_handler.build_users_overview()
+        await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)

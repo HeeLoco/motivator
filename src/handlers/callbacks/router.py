@@ -66,6 +66,7 @@ class CallbackRouter:
             'cancel_broadcast': self.admin_handler.handle_cancel_broadcast,
             'admin_reset_cancel': self.admin_handler.handle_admin_reset_cancel,
             'admin_users_list': self.admin_handler.handle_admin_users_list,
+            'admin_users_overview': self.admin_handler.handle_admin_users_overview,
 
             # Utility
             'close_menu': self._handle_close_menu,

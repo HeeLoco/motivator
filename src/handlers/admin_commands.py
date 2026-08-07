@@ -254,13 +254,57 @@ This will be sent to ALL users. Continue?
         if len(users_info) > 50:
             text += f"\n\n(showing first 50 of {len(users_info)})"
 
+        keyboard.append([InlineKeyboardButton("📄 Text overview", callback_data="admin_users_overview")])
+
         return text, InlineKeyboardMarkup(keyboard)
+
+    def build_users_overview(self):
+        """
+        Build the classic text overview of all users (compact, at a glance).
+        Returns (text, reply_markup) with a switch back to the interactive list.
+        """
+        users_info = self.db.get_all_users_detailed()
+        if not users_info:
+            return "📝 No users found in database.", None
+
+        users_text = f"👥 *All Registered Users* ({len(users_info)})\n"
+
+        for i, user in enumerate(users_info, 1):
+            user_id_str = user['user_id']
+            username = user['username'] or "No username"
+            first_name = user['first_name'] or "No name"
+            language = user['language']
+            frequency = user['message_frequency']
+            active = "✅" if user['active'] else "⏸️"
+            last_active = user['last_active'][:10] if user['last_active'] else "Never"
+
+            users_text += f"""
+*{i}.* `{user_id_str}`
+📛 {first_name} (@{username})
+🌍 {language} | 📊 {frequency}/day | {active}
+🕒 Last: {last_active}
+"""
+
+            # Telegram has message length limits, break into chunks if needed
+            if len(users_text) > 3500:  # Leave room for more text
+                users_text += f"\n... and {len(users_info) - i} more users"
+                break
+
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔘 Interactive list", callback_data="admin_users_list")
+        ]])
+
+        return users_text, keyboard
 
     @admin_only
     async def admin_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show interactive user list or detailed info for specific user"""
         try:
-            if context.args:
+            if context.args and context.args[0].lower() == 'list':
+                # Classic text overview via /admin_users list
+                text, reply_markup = self.build_users_overview()
+                await self._reply(update, text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+            elif context.args:
                 # Direct detail view via /admin_users <user_id>
                 try:
                     target_user_id = int(context.args[0])
