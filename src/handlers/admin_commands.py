@@ -19,6 +19,7 @@ from telegram.constants import ParseMode
 
 from .base import BaseHandler
 from ..content import ContentType
+from src import ai_motivator
 
 logger = logging.getLogger(__name__)
 
@@ -608,6 +609,19 @@ Are you sure you want to proceed?"""
         # Get recent mood to personalize content
         recent_mood = self.db.get_recent_mood(user_id, 1)
         mood_score = recent_mood[0]['score'] if recent_mood else 5
+
+        # Try AI-generated motivation first, fall back to static content
+        ai_text = await ai_motivator.generate_motivation(language, mood_score)
+        if ai_text:
+            try:
+                message = await self.application.bot.send_message(
+                    chat_id=user_id,
+                    text=ai_text
+                )
+                self.db.log_sent_message(user_id, message.message_id, 'ai_text')
+                return
+            except Exception as e:
+                logger.error(f"Error sending AI motivation to user {user_id}: {e}")
 
         # Get recently sent content IDs to avoid duplicates
         duplicate_avoidance_count = user_settings.get('duplicate_avoidance_count', 5)

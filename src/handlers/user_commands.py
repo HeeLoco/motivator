@@ -16,6 +16,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from .base import BaseHandler
+from src import ai_motivator
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +220,24 @@ What would you like to change?
 
         await update.message.reply_text(text)
 
+    async def _send_feedback_buttons(self, update: Update, language: str, message_id: int):
+        """Send instant-feedback buttons referencing a just-sent message"""
+        keyboard = [
+            [
+                InlineKeyboardButton("❤️", callback_data=f"feedback_love_{message_id}"),
+                InlineKeyboardButton("👍", callback_data=f"feedback_like_{message_id}"),
+                InlineKeyboardButton("👎", callback_data=f"feedback_dislike_{message_id}")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        if language == 'de':
+            feedback_text = "💭 Wie hilfreich war diese Nachricht?"
+        else:
+            feedback_text = "💭 How helpful was this message?"
+
+        await update.message.reply_text(feedback_text, reply_markup=reply_markup)
+
     async def motivate_me(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Send an instant motivational message"""
         user_id = update.effective_user.id
@@ -232,6 +251,19 @@ What would you like to change?
         # Get recent mood to personalize content
         recent_mood = self.db.get_recent_mood(user_id, 1)
         mood_score = recent_mood[0]['score'] if recent_mood else 5  # Default to neutral mood
+
+        # Try AI-generated motivation first, fall back to static content
+        ai_text = await ai_motivator.generate_motivation(
+            language, mood_score, update.effective_user.first_name
+        )
+        if ai_text:
+            try:
+                message = await update.message.reply_text(ai_text)
+                self.db.log_sent_message(user_id, message.message_id, 'ai_text')
+                await self._send_feedback_buttons(update, language, message.message_id)
+                return
+            except Exception as e:
+                logger.error(f"Error sending AI motivation to user {user_id}: {e}")
 
         # Get appropriate content based on mood
         content = self.content_manager.get_content_by_mood(mood_score, language)
@@ -269,24 +301,7 @@ What would you like to change?
             self.db.log_sent_message(user_id, message.message_id, content.content_type.value, content.id)
 
             # Add feedback buttons for instant feedback
-            keyboard = [
-                [
-                    InlineKeyboardButton("❤️", callback_data=f"feedback_love_{message.message_id}"),
-                    InlineKeyboardButton("👍", callback_data=f"feedback_like_{message.message_id}"),
-                    InlineKeyboardButton("👎", callback_data=f"feedback_dislike_{message.message_id}")
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            if language == 'de':
-                feedback_text = "💭 Wie hilfreich war diese Nachricht?"
-            else:
-                feedback_text = "💭 How helpful was this message?"
-
-            await update.message.reply_text(
-                feedback_text,
-                reply_markup=reply_markup
-            )
+            await self._send_feedback_buttons(update, language, message.message_id)
 
         except Exception as e:
             logger.error(f"Error sending motivational message to user {user_id}: {e}")

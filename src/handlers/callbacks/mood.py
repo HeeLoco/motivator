@@ -6,6 +6,8 @@ Handles mood-related callback queries:
 - Feedback on motivational messages
 """
 
+from src import ai_motivator
+
 
 class MoodCallbackHandler:
     """Handles mood-related callback queries"""
@@ -30,18 +32,22 @@ class MoodCallbackHandler:
         user_settings = self.db.get_user_settings(user_id)
         language = user_settings.get('language', 'de') if user_settings else 'de'
 
-        # Send appropriate response based on mood
-        content = self.content_manager.get_content_by_mood(mood_score, language)
-
         if language == 'de':
             response = f"Danke für dein Feedback! Stimmung: {mood_score}/10 📝\n\n"
         else:
             response = f"Thanks for sharing! Mood logged: {mood_score}/10 📝\n\n"
 
-        if content:
-            response += content.content
-            if content.media_url:
-                response += f"\n\n🔗 {content.media_url}"
+        # Try an individual AI reaction first, fall back to static content
+        ai_reaction = await ai_motivator.generate_mood_reaction(language, mood_score)
+
+        if ai_reaction:
+            response += ai_reaction
+        else:
+            content = self.content_manager.get_content_by_mood(mood_score, language)
+            if content:
+                response += content.content
+                if content.media_url:
+                    response += f"\n\n🔗 {content.media_url}"
 
         await query.edit_message_text(response)
 
