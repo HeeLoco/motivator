@@ -28,6 +28,7 @@ class Database:
                     message_frequency INTEGER DEFAULT 2,
                     active BOOLEAN DEFAULT 1,
                     duplicate_avoidance_count INTEGER DEFAULT 5,
+                    preferred_name TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -219,6 +220,12 @@ class Database:
             )
             logger.info("Migration: added users.duplicate_avoidance_count")
 
+        # users.preferred_name: how the bot should address the user
+        # (NULL = use Telegram first name, '' = no name at all)
+        if 'preferred_name' not in user_columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN preferred_name TEXT")
+            logger.info("Migration: added users.preferred_name")
+
         # The goal-management feature was removed; drop its orphaned table
         cursor.execute("DROP TABLE IF EXISTS user_goals")
 
@@ -259,7 +266,7 @@ class Database:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT language, timezone, message_frequency, active, duplicate_avoidance_count, first_name
+                    SELECT language, timezone, message_frequency, active, duplicate_avoidance_count, first_name, preferred_name
                     FROM users WHERE user_id = ?
                 """, (user_id,))
                 result = cursor.fetchone()
@@ -270,7 +277,8 @@ class Database:
                         'message_frequency': result[2],
                         'active': result[3],
                         'duplicate_avoidance_count': result[4] or 5,
-                        'first_name': result[5]
+                        'first_name': result[5],
+                        'preferred_name': result[6]
                     }
                 return None
         except Exception as e:

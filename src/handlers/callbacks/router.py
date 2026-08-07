@@ -46,6 +46,10 @@ class CallbackRouter:
         self.exact_handlers = {
             # Settings
             'set_language': self.settings_handler.handle_set_language,
+            'set_name': self.settings_handler.handle_set_name,
+            'name_enter': self.settings_handler.handle_name_choice,
+            'name_telegram': self.settings_handler.handle_name_choice,
+            'name_none': self.settings_handler.handle_name_choice,
             'set_frequency': self.settings_handler.handle_set_frequency,
             'toggle_active': self.settings_handler.handle_toggle_active,
             'set_timing': self.settings_handler.handle_set_timing,

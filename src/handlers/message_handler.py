@@ -19,7 +19,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
 
 from .base import BaseHandler
-from .helpers import get_user_language
+from .helpers import get_display_name, get_user_language
 from src import ai_motivator
 
 from src.logging_config import get_logger
@@ -39,6 +39,11 @@ class MessageHandler(BaseHandler):
         """Handle regular text messages and feedback"""
         user_id = update.effective_user.id
         message_text = update.message.text.lower()
+
+        # Pending name input from the settings menu?
+        if context.user_data.pop('awaiting_preferred_name', False):
+            await self._save_preferred_name(update, user_id)
+            return
 
         # Simple feedback detection
         if message_text in ['❤️', '👍', '👎', 'helpful', 'hilfreich', 'good', 'gut', 'bad', 'schlecht']:
@@ -60,7 +65,8 @@ class MessageHandler(BaseHandler):
         else:
             # Regular message - answer conversationally via AI
             chat_id = update.effective_chat.id
-            language = get_user_language(self.db, user_id)
+            user_settings = self.db.get_user_settings(user_id)
+            language = user_settings.get('language', 'de') if user_settings else 'de'
 
             recent_mood = self.db.get_recent_mood(user_id, 1)
             mood_score = recent_mood[0]['score'] if recent_mood else None
@@ -75,8 +81,8 @@ class MessageHandler(BaseHandler):
             await update.message.chat.send_action(ChatAction.TYPING)
             response = await ai_motivator.generate_chat_reply(
                 language, update.message.text, mood_score, history,
-                update.effective_user.first_name, facts, summary,
-                user_id=user_id
+                get_display_name(user_settings, update.effective_user.first_name),
+                facts, summary, user_id=user_id
             )
 
             if response:
@@ -94,6 +100,28 @@ class MessageHandler(BaseHandler):
                     response = "I received your message! Use /help to see all available commands."
 
             await update.message.reply_text(response)
+
+    async def _save_preferred_name(self, update: Update, user_id: int):
+        """Save the custom address name the user just typed"""
+        name = update.message.text.strip()[:32]
+        language = get_user_language(self.db, user_id)
+
+        if not name:
+            if language == 'de':
+                text = "❌ Das sah leer aus — bitte versuche es nochmal über /settings."
+            else:
+                text = "❌ That looked empty - please try again via /settings."
+            await update.message.reply_text(text)
+            return
+
+        self.db.update_user_setting(user_id, 'preferred_name', name)
+
+        if language == 'de':
+            text = f"📛 Schön, ich nenne dich ab jetzt {name}! 😊"
+        else:
+            text = f"📛 Great, I'll call you {name} from now on! 😊"
+
+        await update.message.reply_text(text)
 
     async def _maintain_memory(self, user_id: int, chat_id: int, language: str):
         """

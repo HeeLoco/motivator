@@ -80,7 +80,7 @@ If the three `AZURE_AI_*` variables are not set, every AI feature silently falls
 |---|---|
 | `/start` | Initialize bot, language selection |
 | `/help` | Show all available commands |
-| `/settings` | Language, frequency, timing, pause/resume, reset |
+| `/settings` | Language, address name, frequency, timing, pause/resume, reset |
 | `/mood` | Log mood (1-10 scale), get an individual AI reaction |
 | `/stats` | View your usage statistics |
 | `/motivateMe` | Get instant AI-generated motivation |

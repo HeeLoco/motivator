@@ -12,7 +12,7 @@ Handles all settings-related callback queries:
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
-from ..helpers import build_settings_view, get_user_language
+from ..helpers import build_settings_view, get_display_name, get_user_language
 
 
 class SettingsCallbackHandler:
@@ -58,6 +58,69 @@ class SettingsCallbackHandler:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text, reply_markup=reply_markup)
+
+    async def handle_set_name(self, query, context):
+        """Show the address-name submenu"""
+        user_id = query.from_user.id
+        user_settings = self.db.get_user_settings(user_id)
+        language = user_settings.get('language', 'de') if user_settings else 'de'
+
+        display_name = get_display_name(user_settings, query.from_user.first_name)
+
+        if language == 'de':
+            current = display_name if display_name else "Keine Namensansprache"
+            text = (f"📛 *Anrede*\n\nAktuell spreche ich dich so an: *{current}*\n\n"
+                    "Wie soll ich dich nennen?")
+            keyboard = [
+                [InlineKeyboardButton("✏️ Eigenen Namen eingeben", callback_data="name_enter")],
+                [InlineKeyboardButton("📱 Telegram-Namen verwenden", callback_data="name_telegram")],
+                [InlineKeyboardButton("🚫 Ohne Namen", callback_data="name_none")],
+                [InlineKeyboardButton("⬅️ Zurück", callback_data="back_to_settings")]
+            ]
+        else:
+            current = display_name if display_name else "No name"
+            text = (f"📛 *Address*\n\nI currently address you as: *{current}*\n\n"
+                    "What should I call you?")
+            keyboard = [
+                [InlineKeyboardButton("✏️ Enter a custom name", callback_data="name_enter")],
+                [InlineKeyboardButton("📱 Use my Telegram name", callback_data="name_telegram")],
+                [InlineKeyboardButton("🚫 No name", callback_data="name_none")],
+                [InlineKeyboardButton("⬅️ Back", callback_data="back_to_settings")]
+            ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
+
+    async def handle_name_choice(self, query, context):
+        """Handle address-name choice (name_enter, name_telegram, name_none)"""
+        user_id = query.from_user.id
+        language = get_user_language(self.db, user_id)
+        choice = query.data
+
+        if choice == 'name_enter':
+            context.user_data['awaiting_preferred_name'] = True
+            if language == 'de':
+                text = "✏️ Schreib mir einfach den Namen, mit dem ich dich ansprechen soll."
+            else:
+                text = "✏️ Just send me the name you'd like me to call you."
+            await query.edit_message_text(text)
+            return
+
+        if choice == 'name_telegram':
+            self.db.update_user_setting(user_id, 'preferred_name', None)
+            name = query.from_user.first_name
+            if language == 'de':
+                text = f"📱 Alles klar, ich nenne dich wieder *{name}*."
+            else:
+                text = f"📱 Got it, I'll call you *{name}* again."
+        else:  # name_none
+            self.db.update_user_setting(user_id, 'preferred_name', '')
+            if language == 'de':
+                text = "🚫 Verstanden, ich spreche dich nicht mehr mit Namen an."
+            else:
+                text = "🚫 Understood, I won't address you by name anymore."
+
+        await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
 
     async def handle_set_frequency(self, query, context):
         """Show frequency selection menu"""

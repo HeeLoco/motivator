@@ -18,6 +18,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from .base import BaseHandler
+from .helpers import get_display_name
 from ..content import ContentType
 from src import ai_motivator
 
@@ -582,7 +583,7 @@ Are you sure you want to proceed?"""
 
         # Try AI-generated motivation first, fall back to static content
         ai_text = await ai_motivator.generate_motivation(
-            language, mood_score, user_settings.get('first_name'),
+            language, mood_score, get_display_name(user_settings),
             self.db.get_user_facts(user_id), user_id=user_id
         )
         if ai_text:

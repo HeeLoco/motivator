@@ -184,6 +184,7 @@ new_content = MotivationalContent(
 - `message_frequency` - 1-5 messages per day
 - `timezone` - User timezone (not fully implemented)
 - `active` - Boolean for pause/resume functionality
+- `preferred_name` - How the bot addresses the user (NULL = Telegram first name, '' = no name, else custom name); set via /settings → Anrede
 
 ### Smart Timing Preferences (Database)
 - `active_start_hour/minute` - When daily messages should begin

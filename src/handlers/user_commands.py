@@ -15,7 +15,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from .base import BaseHandler
-from .helpers import build_settings_view, get_user_language
+from .helpers import build_settings_view, get_display_name, get_user_language
 from src import ai_motivator
 
 from src.logging_config import get_logger
@@ -229,7 +229,8 @@ I'm here to support you! 💙
         # Add user to database if not exists
         self.db.add_user(user_id, update.effective_user.username, update.effective_user.first_name)
 
-        language = get_user_language(self.db, user_id)
+        user_settings = self.db.get_user_settings(user_id)
+        language = user_settings.get('language', 'de') if user_settings else 'de'
 
         # Get recent mood to personalize content
         recent_mood = self.db.get_recent_mood(user_id, 1)
@@ -237,7 +238,8 @@ I'm here to support you! 💙
 
         # Try AI-generated motivation first, fall back to static content
         ai_text = await ai_motivator.generate_motivation(
-            language, mood_score, update.effective_user.first_name,
+            language, mood_score,
+            get_display_name(user_settings, update.effective_user.first_name),
             self.db.get_user_facts(user_id), user_id=user_id
         )
         if ai_text:
