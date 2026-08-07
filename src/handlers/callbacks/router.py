@@ -78,7 +78,7 @@ class CallbackRouter:
 
         data = query.data
 
-        # Try prefix matching first (more specific patterns like goal_delete_confirm_ before goal_delete_)
+        # Try prefix matching first
         # Sort by length descending to match more specific prefixes first
         for prefix in sorted(self.prefix_handlers.keys(), key=len, reverse=True):
             if data.startswith(prefix):

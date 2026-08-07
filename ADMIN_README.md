@@ -306,7 +306,7 @@ Reset all data for a specific user with comprehensive safety measures.
 ### What Gets Reset
 - **Settings**: Reset to defaults (German, 2 msg/day, active)
 - **Mood entries**: All deleted
-- **Goals**: All deleted
+- **AI memory**: All deleted
 - **Feedback**: All deleted
 - **Message history**: All deleted
 
@@ -329,7 +329,7 @@ Target User:
 This will DELETE ALL data for this user:
 • Reset settings to defaults (German, 2 msg/day, active)
 • Delete all mood entries
-• Delete all goals
+• Delete AI conversation memory
 • Delete all feedback
 • Delete all message history
 

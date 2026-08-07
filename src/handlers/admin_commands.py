@@ -11,7 +11,7 @@ Handles admin-only commands:
 Plus helper method for sending scheduled messages.
 """
 
-import logging
+import functools
 from collections import Counter
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -21,7 +21,20 @@ from .base import BaseHandler
 from ..content import ContentType
 from src import ai_motivator
 
-logger = logging.getLogger(__name__)
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
+def admin_only(func):
+    """Restrict a command handler to the configured admin user"""
+    @functools.wraps(func)
+    async def wrapper(self, update, context, *args, **kwargs):
+        if self.admin_user_id is None or update.effective_user.id != self.admin_user_id:
+            await self._reply(update, "❌ This command is only available to administrators.")
+            return
+        return await func(self, update, context, *args, **kwargs)
+    return wrapper
 
 
 class AdminCommandHandler(BaseHandler):
@@ -42,20 +55,21 @@ class AdminCommandHandler(BaseHandler):
         self.admin_user_id = admin_user_id
         self.application = application
 
+    async def _reply(self, update: Update, text: str, **kwargs):
+        """Reply via the message if present, else via the chat (callback context)"""
+        if update.message:
+            await update.message.reply_text(text, **kwargs)
+        elif update.effective_chat:
+            await update.effective_chat.send_message(text, **kwargs)
+
+    @admin_only
     async def admin_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show admin statistics - only for admin users"""
-        user_id = update.effective_user.id
-
-        # Check if user is admin
-        if self.admin_user_id is None or user_id != self.admin_user_id:
-            await update.message.reply_text("❌ This command is only available to administrators.")
-            return
-
         try:
             # Get all users
             all_users = self.db.get_active_users()  # This gets active users
             # Let's get total users (active + inactive)
-            total_users = len(self.db.get_all_users())  # We'll need to create this method
+            total_users = len(self.db.get_all_users())
             active_users = len(all_users)
             inactive_users = total_users - active_users
 
@@ -64,10 +78,10 @@ class AdminCommandHandler(BaseHandler):
             total_messages = sum(global_message_stats.values())
 
             # Get total mood entries
-            total_mood_entries = self.db.get_total_mood_entries()  # We'll need to create this
+            total_mood_entries = self.db.get_total_mood_entries()
 
             # Get recent activity (users active in last 7 days)
-            recent_active = self.db.get_recently_active_users(7)  # We'll need to create this
+            recent_active = self.db.get_recently_active_users(7)
 
             stats_text = f"""
 📊 *Admin Statistics Dashboard*
@@ -93,17 +107,11 @@ class AdminCommandHandler(BaseHandler):
 
         except Exception as e:
             logger.error(f"Error in admin_stats: {e}")
-            await update.message.reply_text("❌ Error retrieving statistics. Check logs for details.")
+            await self._reply(update, "❌ Error retrieving statistics. Check logs for details.")
 
+    @admin_only
     async def admin_broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Send broadcast message to all users - only for admin users"""
-        user_id = update.effective_user.id
-
-        # Check if user is admin
-        if self.admin_user_id is None or user_id != self.admin_user_id:
-            await update.message.reply_text("❌ This command is only available to administrators.")
-            return
-
         # Check if message text was provided
         if not context.args:
             await update.message.reply_text(
@@ -129,7 +137,7 @@ This will be sent to ALL users. Continue?
 """
 
         keyboard = [
-            [InlineKeyboardButton("✅ Send to All Users", callback_data=f"confirm_broadcast")],
+            [InlineKeyboardButton("✅ Send to All Users", callback_data="confirm_broadcast")],
             [InlineKeyboardButton("❌ Cancel", callback_data="cancel_broadcast")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -137,30 +145,15 @@ This will be sent to ALL users. Continue?
         # Store the broadcast message temporarily (we'll need to handle this in callback)
         context.user_data['broadcast_message'] = broadcast_message
 
-        # Safety check for message object
-        if update.message:
-            await update.message.reply_text(
+        await self._reply(
                 confirmation_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=reply_markup
-            )
-        else:
-            # Fallback if called from callback query
-            await update.effective_chat.send_message(
-                confirmation_text,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=reply_markup
-            )
+        )
 
+    @admin_only
     async def admin_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show list of all users or detailed info for specific user - only for admin users"""
-        user_id = update.effective_user.id
-
-        # Check if user is admin
-        if self.admin_user_id is None or user_id != self.admin_user_id:
-            await update.message.reply_text("❌ This command is only available to administrators.")
-            return
-
         try:
             # Check if specific user ID was provided
             if context.args:
@@ -212,11 +205,7 @@ This will be sent to ALL users. Continue?
 • Links: {message_stats.get('link', 0)}
 """
 
-                # Safety check for message object
-                if update.message:
-                    await update.message.reply_text(user_text, parse_mode=ParseMode.MARKDOWN)
-                else:
-                    await update.effective_chat.send_message(user_text, parse_mode=ParseMode.MARKDOWN)
+                await self._reply(update, user_text, parse_mode=ParseMode.MARKDOWN)
 
             else:
                 # Show list of all users (original functionality)
@@ -254,25 +243,15 @@ This will be sent to ALL users. Continue?
                         users_text += f"\n... and {len(users_info) - i} more users"
                         break
 
-                # Safety check for message object
-                if update.message:
-                    await update.message.reply_text(users_text, parse_mode=ParseMode.MARKDOWN)
-                else:
-                    await update.effective_chat.send_message(users_text, parse_mode=ParseMode.MARKDOWN)
+                await self._reply(update, users_text, parse_mode=ParseMode.MARKDOWN)
 
         except Exception as e:
             logger.error(f"Error in admin_users: {e}")
-            await update.message.reply_text("❌ Error retrieving user information. Check logs for details.")
+            await self._reply(update, "❌ Error retrieving user information. Check logs for details.")
 
+    @admin_only
     async def admin_content(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Manage motivational content - only for admin users"""
-        user_id = update.effective_user.id
-
-        # Check if user is admin
-        if self.admin_user_id is None or user_id != self.admin_user_id:
-            await update.message.reply_text("❌ This command is only available to administrators.")
-            return
-
         try:
             # Check if specific action was provided
             if context.args and len(context.args) >= 1:
@@ -309,7 +288,7 @@ This will be sent to ALL users. Continue?
 
         except Exception as e:
             logger.error(f"Error in admin_content: {e}")
-            await update.message.reply_text("❌ Error managing content. Check logs for details.")
+            await self._reply(update, "❌ Error managing content. Check logs for details.")
 
     async def _admin_content_help(self, update: Update):
         """Show admin content management help"""
@@ -327,11 +306,7 @@ This will be sent to ALL users. Continue?
 • `/admin_content remove 15` - Remove content ID 15
 """
 
-        # Safety check for message object
-        if update.message:
-            await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
-        else:
-            await update.effective_chat.send_message(help_text, parse_mode=ParseMode.MARKDOWN)
+        await self._reply(update, help_text, parse_mode=ParseMode.MARKDOWN)
 
     async def _admin_content_list(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """List all motivational content"""
@@ -381,15 +356,11 @@ This will be sent to ALL users. Continue?
 
             content_text += f"\n💡 Use /admin_content remove <id> to delete content"
 
-            # Safety check for message object (send as plain text)
-            if update.message:
-                await update.message.reply_text(content_text)
-            else:
-                await update.effective_chat.send_message(content_text)
+            await self._reply(update, content_text)
 
         except Exception as e:
             logger.error(f"Error in _admin_content_list: {e}")
-            await update.message.reply_text(f"❌ Error listing content: {str(e)}")
+            await self._reply(update, f"❌ Error listing content: {str(e)}")
 
     async def _admin_content_add_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show help for adding content"""
@@ -450,11 +421,7 @@ python scripts/migrate_content_to_db.py
 All content is immediately available after adding!
 """
 
-        # Safety check for message object
-        if update.message:
-            await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
-        else:
-            await update.effective_chat.send_message(help_text, parse_mode=ParseMode.MARKDOWN)
+        await self._reply(update, help_text, parse_mode=ParseMode.MARKDOWN)
 
     async def _admin_content_remove(self, update: Update, content_id: int):
         """Remove content by ID"""
@@ -505,21 +472,11 @@ All content is immediately available after adding!
 **By type:**
 {chr(10).join(type_lines)}"""
 
-        # Safety check for message object
-        if update.message:
-            await update.message.reply_text(stats_text, parse_mode=ParseMode.MARKDOWN)
-        else:
-            await update.effective_chat.send_message(stats_text, parse_mode=ParseMode.MARKDOWN)
+        await self._reply(update, stats_text, parse_mode=ParseMode.MARKDOWN)
 
+    @admin_only
     async def admin_reset(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Reset a specific user's data - only for admin users"""
-        user_id = update.effective_user.id
-
-        # Check if user is admin
-        if self.admin_user_id is None or user_id != self.admin_user_id:
-            await update.message.reply_text("❌ This command is only available to administrators.")
-            return
-
         # Check if user ID was provided
         if not context.args:
             await update.message.reply_text(
@@ -529,9 +486,9 @@ All content is immediately available after adding!
                 "This will reset ALL data for the specified user:\n"
                 "• Settings reset to defaults\n"
                 "• All mood entries deleted\n"
-                "• All goals deleted\n"
                 "• All feedback deleted\n"
-                "• Message history deleted\n\n"
+                "• Message history deleted\n"
+                "• AI conversation memory deleted\n\n"
                 "⚠️ *Warning: This action cannot be undone!*",
                 parse_mode=ParseMode.MARKDOWN
             )
@@ -563,9 +520,9 @@ All content is immediately available after adding!
 **This will DELETE ALL data for this user:**
 • Reset settings to defaults (German, 2 msg/day, active)
 • Delete all mood entries
-• Delete all goals
 • Delete all feedback
 • Delete all message history
+• Delete AI conversation memory
 
 **⚠️ This action cannot be undone!**
 
@@ -577,19 +534,12 @@ Are you sure you want to proceed?"""
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # Safety check for message object
-        if update.message:
-            await update.message.reply_text(
-                confirmation_text,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=reply_markup
-            )
-        else:
-            await update.effective_chat.send_message(
-                confirmation_text,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=reply_markup
-            )
+        await self._reply(
+            update,
+            confirmation_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=reply_markup
+        )
 
     async def send_motivational_message(self, user_id: int):
         """

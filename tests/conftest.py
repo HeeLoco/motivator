@@ -5,7 +5,7 @@ Provides common test fixtures including mocks for database, bot, and Telegram ob
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, MagicMock
+from unittest.mock import Mock, AsyncMock
 from datetime import datetime
 
 # Mock Telegram types

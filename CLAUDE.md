@@ -47,11 +47,8 @@ python main.py  # Recreates database
 
 ### Testing
 ```bash
-# Test logging system (both JSON and text formats)
-python test_logging.py
-
-# Test module imports
-python test_imports.py
+# Run the test suite (uses mocks, AI calls disabled via conftest autouse fixture)
+pytest
 
 # Manual testing
 # - Test manually by interacting with the bot
@@ -250,9 +247,9 @@ docker compose ps
 - File logging disabled by default in containers
 
 **Database Persistence:**
-- Database mounted as volume in docker-compose.yml
+- Database lives in the mounted `./data` directory (`DB_PATH=/data/motivator.db`)
 - Survives container restarts
-- Backup: `cp motivator.db motivator.db.backup`
+- Backup: `cp data/motivator.db data/motivator.db.backup`
 
 **Optional: Log Aggregation with Loki**
 Uncomment the Loki, Promtail, and Grafana sections in docker-compose.yml to enable centralized logging:

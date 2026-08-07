@@ -6,10 +6,11 @@ Handles admin-related callback queries:
 - User reset confirmation/cancellation
 """
 
-import logging
 from telegram.constants import ParseMode
 
-logger = logging.getLogger(__name__)
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class AdminCallbackHandler:
@@ -117,9 +118,9 @@ Message: "{broadcast_message}"
 **Actions performed:**
 • Settings reset to defaults (German, 2 msg/day, active)
 • All mood entries deleted
-• All goals deleted
 • All feedback deleted
 • Message history cleared
+• AI conversation memory deleted
 
 The user can now start fresh with default settings."""
         else:

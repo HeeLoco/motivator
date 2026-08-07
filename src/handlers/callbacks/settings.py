@@ -12,6 +12,8 @@ Handles all settings-related callback queries:
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from ..helpers import build_settings_view, get_user_language
+
 
 class SettingsCallbackHandler:
     """Handles settings-related callback queries"""
@@ -42,8 +44,7 @@ class SettingsCallbackHandler:
     async def handle_set_language(self, query, context):
         """Show language selection menu"""
         user_id = query.from_user.id
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = "🌍 Sprache wählen:"
@@ -86,8 +87,7 @@ class SettingsCallbackHandler:
         frequency = int(query.data.split("_")[1])
         self.db.update_user_setting(user_id, 'message_frequency', frequency)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = f"📊 Nachrichtenhäufigkeit auf {frequency} pro Tag eingestellt!\n\nVerwende /settings um weitere Einstellungen anzupassen."
@@ -164,8 +164,7 @@ What would you like to change?"""
     async def handle_set_start_time(self, query, context):
         """Show start time selection menu"""
         user_id = query.from_user.id
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = "🌅 *Start-Zeit wählen*\n\nWann sollen die Nachrichten beginnen?"
@@ -185,8 +184,7 @@ What would you like to change?"""
     async def handle_set_end_time(self, query, context):
         """Show end time selection menu"""
         user_id = query.from_user.id
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = "🌙 *End-Zeit wählen*\n\nWann sollen die Nachrichten enden?"
@@ -206,8 +204,7 @@ What would you like to change?"""
     async def handle_set_min_gap(self, query, context):
         """Show minimum gap selection menu"""
         user_id = query.from_user.id
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = "⏱️ *Mindestabstand wählen*\n\nWie viele Stunden sollen mindestens zwischen Nachrichten liegen?"
@@ -233,8 +230,7 @@ What would you like to change?"""
         hour = int(query.data.split("_")[-1])
         self.db.update_timing_preference(user_id, 'active_start_hour', hour)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = f"✅ Start-Zeit auf {hour:02d}:00 eingestellt!\n\nVerwende /settings um weitere Einstellungen anzupassen."
@@ -249,8 +245,7 @@ What would you like to change?"""
         hour = int(query.data.split("_")[-1])
         self.db.update_timing_preference(user_id, 'active_end_hour', hour)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = f"✅ End-Zeit auf {hour:02d}:00 eingestellt!\n\nVerwende /settings um weitere Einstellungen anzupassen."
@@ -265,8 +260,7 @@ What would you like to change?"""
         hours = int(query.data.split("_")[-1])
         self.db.update_timing_preference(user_id, 'min_gap_hours', hours)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = f"✅ Mindestabstand auf {hours} Stunde{'n' if hours > 1 else ''} eingestellt!\n\nVerwende /settings um weitere Einstellungen anzupassen."
@@ -278,8 +272,7 @@ What would you like to change?"""
     async def handle_reset_user(self, query, context):
         """Show reset confirmation dialog"""
         user_id = query.from_user.id
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = """⚠️ *Warnung: Daten zurücksetzen*
@@ -287,9 +280,9 @@ What would you like to change?"""
 Das wird ALLE deine Daten löschen:
 • Alle Einstellungen zurücksetzen
 • Stimmungseinträge löschen
-• Ziele löschen
 • Feedback-Historie löschen
 • Nachrichtenverlauf löschen
+• KI-Gesprächsgedächtnis löschen
 
 Bist du sicher, dass du fortfahren möchtest?
 
@@ -300,9 +293,9 @@ Bist du sicher, dass du fortfahren möchtest?
 This will DELETE ALL your data:
 • Reset all settings
 • Delete mood entries
-• Delete goals
 • Delete feedback history
 • Delete message history
+• Delete AI conversation memory
 
 Are you sure you want to continue?
 
@@ -319,8 +312,7 @@ Are you sure you want to continue?
     async def handle_confirm_reset(self, query, context):
         """Execute user data reset"""
         user_id = query.from_user.id
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         # Reset user data
         success = self.db.reset_user_data(user_id)
@@ -364,50 +356,7 @@ You can now use /settings to configure new preferences."""
             await query.edit_message_text("Please start the bot first with /start")
             return
 
-        language = user_settings['language']
-        frequency = user_settings['message_frequency']
-        active = "✅ Active" if user_settings['active'] else "⏸️ Paused"
-
-        if language == 'de':
-            settings_text = f"""
-⚙️ *Deine Einstellungen*
-
-Sprache: {'🇩🇪 Deutsch' if language == 'de' else '🇬🇧 English'}
-Nachrichten pro Tag: {frequency}
-Status: {active}
-
-Was möchtest du ändern?
-"""
-            keyboard = [
-                [InlineKeyboardButton("🌍 Sprache", callback_data="set_language")],
-                [InlineKeyboardButton("📊 Häufigkeit", callback_data="set_frequency")],
-                [InlineKeyboardButton("⏸️ Pausieren" if user_settings['active'] else "▶️ Fortsetzen",
-                                    callback_data="toggle_active")],
-                [InlineKeyboardButton("⏰ Zeiten", callback_data="set_timing")],
-                [InlineKeyboardButton("🔄 Zurücksetzen", callback_data="reset_user")],
-                [InlineKeyboardButton("❌ Schließen", callback_data="close_menu")]
-            ]
-        else:
-            settings_text = f"""
-⚙️ *Your Settings*
-
-Language: {'🇩🇪 Deutsch' if language == 'de' else '🇬🇧 English'}
-Messages per day: {frequency}
-Status: {active}
-
-What would you like to change?
-"""
-            keyboard = [
-                [InlineKeyboardButton("🌍 Language", callback_data="set_language")],
-                [InlineKeyboardButton("📊 Frequency", callback_data="set_frequency")],
-                [InlineKeyboardButton("⏸️ Pause" if user_settings['active'] else "▶️ Resume",
-                                    callback_data="toggle_active")],
-                [InlineKeyboardButton("⏰ Timing", callback_data="set_timing")],
-                [InlineKeyboardButton("🔄 Reset", callback_data="reset_user")],
-                [InlineKeyboardButton("❌ Close", callback_data="close_menu")]
-            ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        settings_text, reply_markup = build_settings_view(user_settings)
         await query.edit_message_text(
             settings_text,
             parse_mode=ParseMode.MARKDOWN,

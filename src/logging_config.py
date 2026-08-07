@@ -12,11 +12,12 @@ Features:
 """
 
 import logging
+import logging.handlers
 import json
 import os
 import sys
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional
 import contextvars
 
 # Context variable for correlation ID (thread-safe)
@@ -198,10 +199,12 @@ def setup_logging(
     stdout_handler.addFilter(CorrelationIDFilter())
     handlers.append(stdout_handler)
 
-    # Add file handler if log_file is specified
+    # Add rotating file handler if log_file is specified (10 MB x 3 backups)
     if log_file:
         try:
-            file_handler = logging.FileHandler(log_file)
+            file_handler = logging.handlers.RotatingFileHandler(
+                log_file, maxBytes=10 * 1024 * 1024, backupCount=3
+            )
             file_handler.setFormatter(formatter)
             file_handler.addFilter(CorrelationIDFilter())
             handlers.append(file_handler)

@@ -50,3 +50,5 @@ ENV/
 # Telegram Bot specific
 motivator.db
 motivator_bot.log
+*.db.backup*
+

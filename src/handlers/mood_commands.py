@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from .base import BaseHandler
+from .helpers import get_user_language
 
 
 class MoodCommandHandler(BaseHandler):
@@ -18,8 +19,7 @@ class MoodCommandHandler(BaseHandler):
 
     async def mood_check(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Mood tracking interface"""
-        user_settings = self.db.get_user_settings(update.effective_user.id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, update.effective_user.id)
 
         if language == 'de':
             mood_text = "🌈 *Wie fühlst du dich heute?*\n\nWähle eine Zahl von 1 (sehr schlecht) bis 10 (ausgezeichnet):"
@@ -47,8 +47,7 @@ class MoodCommandHandler(BaseHandler):
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show user statistics"""
         user_id = update.effective_user.id
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         # Get statistics
         message_stats = self.db.get_message_stats(user_id)

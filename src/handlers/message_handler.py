@@ -13,16 +13,18 @@ summary + user facts + the recent verbatim turns.
 """
 
 import asyncio
-import logging
 
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
 
 from .base import BaseHandler
+from .helpers import get_user_language
 from src import ai_motivator
 
-logger = logging.getLogger(__name__)
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class MessageHandler(BaseHandler):
@@ -58,8 +60,7 @@ class MessageHandler(BaseHandler):
         else:
             # Regular message - answer conversationally via AI
             chat_id = update.effective_chat.id
-            user_settings = self.db.get_user_settings(user_id)
-            language = user_settings.get('language', 'de') if user_settings else 'de'
+            language = get_user_language(self.db, user_id)
 
             recent_mood = self.db.get_recent_mood(user_id, 1)
             mood_score = recent_mood[0]['score'] if recent_mood else None

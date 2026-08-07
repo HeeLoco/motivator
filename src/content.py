@@ -1,7 +1,11 @@
 import random
-from typing import Dict, List, Any
 from dataclasses import dataclass
 from enum import Enum
+from typing import Dict, List
+
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class ContentType(Enum):
     TEXT = "text"
@@ -39,30 +43,50 @@ class ContentManager:
         self.content = self._load_content()
 
     def _load_content(self) -> Dict[str, List[MotivationalContent]]:
-        """Load motivational content from database or fallback to hardcoded"""
+        """Load motivational content from database, seeding it on first run"""
         # Try to load from database first
         if self.db:
             try:
-                return self._load_from_database()
+                content = self._load_from_database()
+                if not any(content.values()):
+                    # Empty table (fresh install): seed from built-in content
+                    self._seed_database_content()
+                    content = self._load_from_database()
+                return content
             except Exception as e:
-                import logging
-                logging.error(f"Failed to load content from database: {e}")
-                logging.warning("Falling back to hardcoded content")
+                logger.error(f"Failed to load content from database: {e}")
+                logger.warning("Falling back to hardcoded content")
 
         # Fallback to hardcoded content
         return self._load_hardcoded_content()
 
+    def _seed_database_content(self):
+        """Populate an empty motivational_content table from the built-in seed content"""
+        seed = self._load_hardcoded_content()
+        count = 0
+        for items in seed.values():
+            for item in items:
+                content_id = self.db.add_content(
+                    content=item.content,
+                    content_type=item.content_type.value,
+                    language=item.language,
+                    category=item.category.value,
+                    media_url=item.media_url
+                )
+                if content_id is not None:
+                    count += 1
+        logger.info(f"Seeded motivational_content table with {count} entries")
+
     def _load_from_database(self) -> Dict[str, List[MotivationalContent]]:
         """Load content from database"""
         import json
-        import logging
 
         content = {'en': [], 'de': []}
 
         # Get all active content from database
         db_content = self.db.get_all_content(active_only=True)
 
-        logging.info(f"Loading {len(db_content)} content items from database")
+        logger.info(f"Loading {len(db_content)} content items from database")
 
         for item in db_content:
             try:
@@ -91,17 +115,17 @@ class ContentManager:
                     content[content_obj.language] = [content_obj]
 
             except Exception as e:
-                logging.error(f"Error loading content item {item.get('id')}: {e}")
+                logger.error(f"Error loading content item {item.get('id')}: {e}")
 
-        logging.info(f"Loaded content by language: {
+        logger.info(f"Loaded content by language: {
 {lang: len(items) for lang, items in content.items()}}")
 
         return content
 
     def _load_hardcoded_content(self) -> Dict[str, List[MotivationalContent]]:
         """
-        FALLBACK: Hardcoded content (kept for emergencies)
-        This is only used if database loading fails
+        Built-in seed content: populates an empty motivational_content table
+        on first run and serves as emergency fallback if the database fails.
         """
         content = {
             'en': [],
@@ -132,8 +156,6 @@ class ContentManager:
             MotivationalContent(11, "Today's reminder: Drink water, get some sunlight, and be kind to yourself. 🌞", ContentType.TEXT, 'en', MoodCategory.SELF_CARE),
             
             # Media Content
-            MotivationalContent(12, "5-minute meditation for anxiety relief", ContentType.VIDEO, 'en', MoodCategory.ANXIETY, "https://www.youtube.com/shorts/example1"),
-            MotivationalContent(13, "Quick breathing exercise for stress", ContentType.VIDEO, 'en', MoodCategory.STRESS, "https://www.youtube.com/shorts/example2"),
             MotivationalContent(14, "Mental Health Resources", ContentType.LINK, 'en', MoodCategory.GENERAL, "https://www.mentalhealth.gov/"),
         ]
         
@@ -151,9 +173,7 @@ class ContentManager:
             MotivationalContent(32, "Wenn du keine Lust hast, von vorne anzufangen, dann gib nicht auf.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
             MotivationalContent(33, "Du kannst die Zukunft verändern mit dem, was du heute tust.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
             MotivationalContent(34, "Ehrgeiz ist die Fähigkeit, die Träume real werden lässt.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
-
-
-            MotivationalContent(34, "Innen muss etwas brennen, damit außen etwas leuchten kann.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
+            MotivationalContent(40, "Innen muss etwas brennen, damit außen etwas leuchten kann.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
             MotivationalContent(35, "Scheitern ist nicht das Gegenteil von Erfolg. Es ist ein Teil davon.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
             MotivationalContent(36, "Nicht wie groß der erste Schritt ist zählt, sondern die richtige Richtung.", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
             MotivationalContent(37, "Warte nicht auf Motivation. Sei du die Motivation für andere!", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
@@ -178,8 +198,6 @@ class ContentManager:
             MotivationalContent(25, "Heutige Erinnerung: Trinke Wasser, hole dir etwas Sonnenlicht und sei freundlich zu dir selbst. 🌞", ContentType.TEXT, 'de', MoodCategory.SELF_CARE),
             
             # Media-Inhalte
-            MotivationalContent(26, "5-Minuten Meditation gegen Angst", ContentType.VIDEO, 'de', MoodCategory.ANXIETY, "https://www.youtube.com/shorts/example3"),
-            MotivationalContent(27, "Schnelle Atemübung gegen Stress", ContentType.VIDEO, 'de', MoodCategory.STRESS, "https://www.youtube.com/shorts/example4"),
             MotivationalContent(28, "Ressourcen für psychische Gesundheit", ContentType.LINK, 'de', MoodCategory.GENERAL, "https://www.bundesgesundheitsministerium.de/themen/praevention/gesundheitsfoerderung/praevention-psychischer-erkrankungen.html"),
         ]
         
@@ -243,7 +261,6 @@ class ContentManager:
     
     def remove_content(self, content_id: int) -> bool:
         """Remove content by ID (from database and memory)"""
-        import logging
 
         # If database is available, delete from database
         if self.db:
@@ -253,19 +270,19 @@ class ContentManager:
                     # Also remove from memory
                     for language in self.content:
                         self.content[language] = [c for c in self.content[language] if c.id != content_id]
-                    logging.info(f"Removed content ID {content_id} from database and memory")
+                    logger.info(f"Removed content ID {content_id} from database and memory")
                     return True
                 else:
-                    logging.warning(f"Failed to remove content ID {content_id} from database")
+                    logger.warning(f"Failed to remove content ID {content_id} from database")
                     return False
             except Exception as e:
-                logging.error(f"Error removing content from database: {e}")
+                logger.error(f"Error removing content from database: {e}")
                 return False
         else:
             # Fallback: remove from memory only (hardcoded mode)
             for language in self.content:
                 self.content[language] = [c for c in self.content[language] if c.id != content_id]
-            logging.warning("Removed content from memory only (no database connection)")
+            logger.warning("Removed content from memory only (no database connection)")
             return True
 
     def add_content_to_db(self, content: str, content_type: str, language: str,
@@ -284,10 +301,9 @@ class ContentManager:
         Returns:
             bool: True if added successfully
         """
-        import logging
 
         if not self.db:
-            logging.error("Cannot add content: No database connection")
+            logger.error("Cannot add content: No database connection")
             return False
 
         try:
@@ -317,12 +333,12 @@ class ContentManager:
                 else:
                     self.content[language] = [content_obj]
 
-                logging.info(f"Added new content to database and memory: ID {content_id}")
+                logger.info(f"Added new content to database and memory: ID {content_id}")
                 return True
             else:
-                logging.error("Failed to add content to database")
+                logger.error("Failed to add content to database")
                 return False
 
         except Exception as e:
-            logging.error(f"Error adding content to database: {e}")
+            logger.error(f"Error adding content to database: {e}")
             return False

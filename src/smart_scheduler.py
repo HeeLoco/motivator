@@ -1,8 +1,8 @@
 import random
-import asyncio
+
 import uuid
-from datetime import datetime, timedelta, time
-from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -21,21 +21,13 @@ class SmartMessageScheduler:
         """Start the smart message scheduler"""
         self.bot = bot_instance
         
-        # Remove the frequent 10-minute check - use smarter scheduling
         # Main scheduling check every hour
         self.scheduler.add_job(
             func=self._smart_scheduling_check,
             trigger=CronTrigger(minute=0),  # Every hour at minute 0
             id='smart_message_check'
         )
-        
-        # Daily planning - plan next day's messages at midnight
-        self.scheduler.add_job(
-            func=self._plan_daily_messages,
-            trigger=CronTrigger(hour=0, minute=5),  # 12:05 AM daily
-            id='daily_message_planning'
-        )
-        
+
         # Daily mood reminder (8 PM)
         self.scheduler.add_job(
             func=self._send_mood_reminders,
@@ -134,44 +126,28 @@ class SmartMessageScheduler:
     async def _user_has_enough_messages_today(self, user_id: int, target_frequency: float) -> bool:
         """Check if user already received enough messages today"""
         try:
-            # Get today's sent messages count
             today = datetime.now().strftime('%Y-%m-%d')
             sent_today = self.db.get_message_stats_by_date(user_id, today)
-            
-            # Include scheduled messages for today
-            scheduled_today = await self._count_scheduled_messages_today(user_id)
-            
-            total_today = sent_today + scheduled_today
-            
-            return total_today >= int(target_frequency)
-            
+
+            return sent_today >= int(target_frequency)
+
         except Exception as e:
             logger.error(f"Error checking daily message count: {e}")
             return False
-    
-    async def _count_scheduled_messages_today(self, user_id: int) -> int:
-        """Count messages already scheduled for today"""
-        try:
-            # This would require tracking scheduled jobs - simplified implementation
-            # In a full implementation, you'd maintain a schedule database
-            return 0
-        except Exception as e:
-            logger.error(f"Error counting scheduled messages: {e}")
-            return 0
-    
+
     async def _check_minimum_gap(self, user_id: int, min_gap_hours: int) -> bool:
         """Check if enough time passed since last message"""
         try:
-            # Get last sent message time
-            last_messages = self.db.get_message_stats_detailed(user_id, 1)
-            if not last_messages:
+            last_sent_at = self.db.get_last_sent_at(user_id)
+            if not last_sent_at:
                 return True
-            
-            last_message_time = datetime.fromisoformat(last_messages[0]['sent_at'])
-            time_since_last = datetime.now() - last_message_time
-            
+
+            # sent_at comes from SQLite CURRENT_TIMESTAMP, which is UTC
+            last_message_time = datetime.fromisoformat(last_sent_at)
+            time_since_last = datetime.now(timezone.utc).replace(tzinfo=None) - last_message_time
+
             return time_since_last.total_seconds() >= (min_gap_hours * 3600)
-            
+
         except Exception as e:
             logger.error(f"Error checking minimum gap: {e}")
             return True  # Allow if unsure
@@ -276,12 +252,6 @@ class SmartMessageScheduler:
             )
         finally:
             clear_correlation_id()
-    
-    async def _plan_daily_messages(self):
-        """Plan next day's messages for optimal distribution (future enhancement)"""
-        # This would implement advanced daily planning
-        # For now, we rely on hourly smart checks
-        logger.info("Daily message planning - using smart hourly checks")
     
     async def _send_mood_reminders(self):
         """Send daily mood check reminders (unchanged from original)"""

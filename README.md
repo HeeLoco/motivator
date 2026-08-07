@@ -259,11 +259,8 @@ See `CLAUDE.md` for the full logging reference (correlation IDs, `log_with_conte
 ```bash
 # Run the test suite
 pytest
-
-# Quick smoke tests
-python test_imports.py
-python test_logging.py
 ```
+AI calls are automatically disabled in tests (see `tests/conftest.py`), so the suite runs offline and exercises the static fallback paths.
 
 ## Privacy & Security
 

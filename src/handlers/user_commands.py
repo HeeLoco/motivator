@@ -10,15 +10,17 @@ Handles basic user commands:
 - /motivateMe - Instant motivation
 """
 
-import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from .base import BaseHandler
+from .helpers import build_settings_view, get_user_language
 from src import ai_motivator
 
-logger = logging.getLogger(__name__)
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class UserCommandHandler(BaseHandler):
@@ -71,8 +73,7 @@ Welche Sprache bevorzugst du?
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show help information"""
-        user_settings = self.db.get_user_settings(update.effective_user.id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, update.effective_user.id)
 
         if language == 'de':
             help_text = """
@@ -142,50 +143,7 @@ I'm here to support you! 💙
             await update.message.reply_text("Please start the bot first with /start")
             return
 
-        language = user_settings['language']
-        frequency = user_settings['message_frequency']
-        active = "✅ Active" if user_settings['active'] else "⏸️ Paused"
-
-        if language == 'de':
-            settings_text = f"""
-⚙️ *Deine Einstellungen*
-
-Sprache: {'🇩🇪 Deutsch' if language == 'de' else '🇬🇧 English'}
-Nachrichten pro Tag: {frequency}
-Status: {active}
-
-Was möchtest du ändern?
-"""
-            keyboard = [
-                [InlineKeyboardButton("🌍 Sprache", callback_data="set_language")],
-                [InlineKeyboardButton("📊 Häufigkeit", callback_data="set_frequency")],
-                [InlineKeyboardButton("⏸️ Pausieren" if user_settings['active'] else "▶️ Fortsetzen",
-                                    callback_data="toggle_active")],
-                [InlineKeyboardButton("⏰ Zeiten", callback_data="set_timing")],
-                [InlineKeyboardButton("🔄 Zurücksetzen", callback_data="reset_user")],
-                [InlineKeyboardButton("❌ Schließen", callback_data="close_menu")]
-            ]
-        else:
-            settings_text = f"""
-⚙️ *Your Settings*
-
-Language: {'🇩🇪 Deutsch' if language == 'de' else '🇬🇧 English'}
-Messages per day: {frequency}
-Status: {active}
-
-What would you like to change?
-"""
-            keyboard = [
-                [InlineKeyboardButton("🌍 Language", callback_data="set_language")],
-                [InlineKeyboardButton("📊 Frequency", callback_data="set_frequency")],
-                [InlineKeyboardButton("⏸️ Pause" if user_settings['active'] else "▶️ Resume",
-                                    callback_data="toggle_active")],
-                [InlineKeyboardButton("⏰ Timing", callback_data="set_timing")],
-                [InlineKeyboardButton("🔄 Reset", callback_data="reset_user")],
-                [InlineKeyboardButton("❌ Close", callback_data="close_menu")]
-            ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        settings_text, reply_markup = build_settings_view(user_settings)
         await update.message.reply_text(
             settings_text,
             parse_mode=ParseMode.MARKDOWN,
@@ -197,8 +155,7 @@ What would you like to change?
         user_id = update.effective_user.id
         self.db.update_user_setting(user_id, 'active', False)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = "⏸️ Motivierende Nachrichten wurden pausiert. Verwende /resume um sie wieder zu aktivieren."
@@ -212,8 +169,7 @@ What would you like to change?
         user_id = update.effective_user.id
         self.db.update_user_setting(user_id, 'active', True)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             text = "▶️ Motivierende Nachrichten wurden wieder aktiviert! 🌟"
@@ -273,8 +229,7 @@ What would you like to change?
         # Add user to database if not exists
         self.db.add_user(user_id, update.effective_user.username, update.effective_user.first_name)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         # Get recent mood to personalize content
         recent_mood = self.db.get_recent_mood(user_id, 1)

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   motivator-bot:
     build: .
@@ -12,6 +10,14 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - ADMIN_USER_ID=${ADMIN_USER_ID:-}
 
+      # AI configuration (optional - falls back to static content if unset)
+      - AZURE_AI_ENDPOINT=${AZURE_AI_ENDPOINT:-}
+      - AZURE_AI_DEPLOYMENT=${AZURE_AI_DEPLOYMENT:-}
+      - AZURE_AI_API_KEY=${AZURE_AI_API_KEY:-}
+
+      # Database lives on the mounted volume
+      - DB_PATH=/data/motivator.db
+
       # Logging configuration
       - CONTAINER_ENV=true
       - LOG_FORMAT=json
@@ -19,10 +25,9 @@ services:
       # File logging disabled in container (logs go to stdout/stderr)
       - LOG_FILE=
 
-    # Mount database as volume for persistence
+    # Mount data directory for database persistence
     volumes:
       - ./data:/data
-      - ./motivator.db:/app/motivator.db
 
     # Logging configuration for Docker
     logging:
@@ -32,14 +37,6 @@ services:
         max-file: "3"
         labels: "service=motivator-bot"
         tag: "{{.Name}}/{{.ID}}"
-
-    # Health check (optional)
-    healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
 # Optional: Add Grafana Loki for log aggregation
 # Uncomment the sections below to enable Loki

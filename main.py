@@ -3,7 +3,7 @@
 Motivator Bot - A Telegram bot for mental health motivation and support
 
 This bot sends personalized motivational messages to users throughout the day,
-tracks mood and goals, and provides mental health resources.
+tracks mood, and provides mental health resources.
 """
 
 import os

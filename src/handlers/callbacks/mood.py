@@ -9,6 +9,8 @@ Handles mood-related callback queries:
 from src import ai_motivator
 
 
+from ..helpers import get_user_language
+
 class MoodCallbackHandler:
     """Handles mood-related callback queries"""
 
@@ -29,8 +31,7 @@ class MoodCallbackHandler:
         mood_score = int(query.data.split("_")[1])
         self.db.add_mood_entry(user_id, mood_score)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         if language == 'de':
             response = f"Danke für dein Feedback! Stimmung: {mood_score}/10 📝\n\n"
@@ -73,8 +74,7 @@ class MoodCallbackHandler:
         # Log feedback
         self.db.add_feedback(user_id, message_id, 'instant_feedback', feedback_value)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         # Send thank you message
         if language == 'de':
