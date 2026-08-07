@@ -38,7 +38,9 @@ class MoodCallbackHandler:
             response = f"Thanks for sharing! Mood logged: {mood_score}/10 📝\n\n"
 
         # Try an individual AI reaction first, fall back to static content
-        ai_reaction = await ai_motivator.generate_mood_reaction(language, mood_score)
+        ai_reaction = await ai_motivator.generate_mood_reaction(
+            language, mood_score, query.from_user.first_name
+        )
 
         if ai_reaction:
             response += ai_reaction

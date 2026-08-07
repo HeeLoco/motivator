@@ -48,6 +48,20 @@ def _instructions(language: str) -> str:
     return _BASE_INSTRUCTIONS.get(language, _BASE_INSTRUCTIONS['de'])
 
 
+def _name_context(language: str, first_name: Optional[str]) -> str:
+    if not first_name:
+        return ""
+    if language == 'de':
+        return (
+            f"Der Nutzer heißt {first_name}. Sprich ihn gelegentlich persönlich "
+            "mit seinem Namen an, aber nicht zwanghaft in jeder Nachricht. "
+        )
+    return (
+        f"The user's name is {first_name}. Address them personally by name "
+        "occasionally, but not forcedly in every message. "
+    )
+
+
 def _mood_context(language: str, mood_score: Optional[int]) -> str:
     if mood_score is None:
         return ""
@@ -59,29 +73,23 @@ def _mood_context(language: str, mood_score: Optional[int]) -> str:
 async def generate_motivation(language: str, mood_score: Optional[int] = None,
                               first_name: Optional[str] = None) -> Optional[str]:
     """Generate a personalized motivational message."""
-    name_part = ""
-    if first_name:
-        if language == 'de':
-            name_part = f"Der Nutzer heißt {first_name}. "
-        else:
-            name_part = f"The user's name is {first_name}. "
-
     if language == 'de':
         prompt = (
-            f"{name_part}{_mood_context(language, mood_score)}"
+            f"{_name_context(language, first_name)}{_mood_context(language, mood_score)}"
             "Schreibe eine kurze, persönliche Motivationsnachricht, die zur Stimmung passt."
         )
     else:
         prompt = (
-            f"{name_part}{_mood_context(language, mood_score)}"
+            f"{_name_context(language, first_name)}{_mood_context(language, mood_score)}"
             "Write a short, personal motivational message that fits the mood."
         )
 
     return await generate_response(prompt, instructions=_instructions(language))
 
 
-def _chat_instructions(language: str, mood_score: Optional[int]) -> str:
-    """Instructions for conversational replies, including mood context."""
+def _chat_instructions(language: str, mood_score: Optional[int],
+                       first_name: Optional[str]) -> str:
+    """Instructions for conversational replies, including user context."""
     base = _instructions(language)
     if language == 'de':
         extra = (
@@ -95,13 +103,14 @@ def _chat_instructions(language: str, mood_score: Optional[int]) -> str:
             "If a bot command would help (/mood for mood tracking, /motivateMe "
             "for motivation, /settings for preferences), mention it briefly."
         )
-    mood = _mood_context(language, mood_score)
-    return f"{base}{extra}\n{mood}" if mood else f"{base}{extra}"
+    context = f"{_name_context(language, first_name)}{_mood_context(language, mood_score)}"
+    return f"{base}{extra}\n{context}" if context else f"{base}{extra}"
 
 
 async def generate_chat_reply(language: str, user_message: str,
                               mood_score: Optional[int] = None,
-                              history: Optional[List[Dict[str, str]]] = None) -> Optional[str]:
+                              history: Optional[List[Dict[str, str]]] = None,
+                              first_name: Optional[str] = None) -> Optional[str]:
     """
     Generate an empathetic reply to a free-text message from the user.
 
@@ -110,15 +119,17 @@ async def generate_chat_reply(language: str, user_message: str,
     """
     return await generate_response(
         user_message,
-        instructions=_chat_instructions(language, mood_score),
+        instructions=_chat_instructions(language, mood_score, first_name),
         history=history,
     )
 
 
-async def generate_mood_reaction(language: str, mood_score: int) -> Optional[str]:
+async def generate_mood_reaction(language: str, mood_score: int,
+                                 first_name: Optional[str] = None) -> Optional[str]:
     """Generate an individual reaction to a fresh mood entry."""
     if language == 'de':
         prompt = (
+            f"{_name_context(language, first_name)}"
             f"Der Nutzer hat gerade seine Stimmung mit {mood_score}/10 erfasst "
             "(1=sehr schlecht, 10=sehr gut). Reagiere individuell darauf: "
             "Bei niedriger Stimmung tröstend und stabilisierend, bei mittlerer "
@@ -126,6 +137,7 @@ async def generate_mood_reaction(language: str, mood_score: int) -> Optional[str
         )
     else:
         prompt = (
+            f"{_name_context(language, first_name)}"
             f"The user just logged their mood as {mood_score}/10 "
             "(1=very low, 10=very good). React individually: comforting and "
             "grounding for low moods, encouraging for medium, celebrate and "

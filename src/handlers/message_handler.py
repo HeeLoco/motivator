@@ -54,7 +54,8 @@ class MessageHandler(BaseHandler):
 
             await update.message.chat.send_action(ChatAction.TYPING)
             response = await ai_motivator.generate_chat_reply(
-                language, update.message.text, mood_score, history
+                language, update.message.text, mood_score, history,
+                update.effective_user.first_name
             )
 
             if response:

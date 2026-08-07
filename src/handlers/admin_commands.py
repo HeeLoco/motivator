@@ -611,7 +611,9 @@ Are you sure you want to proceed?"""
         mood_score = recent_mood[0]['score'] if recent_mood else 5
 
         # Try AI-generated motivation first, fall back to static content
-        ai_text = await ai_motivator.generate_motivation(language, mood_score)
+        ai_text = await ai_motivator.generate_motivation(
+            language, mood_score, user_settings.get('first_name')
+        )
         if ai_text:
             try:
                 message = await self.application.bot.send_message(

@@ -175,17 +175,18 @@ class Database:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT language, timezone, message_frequency, active, duplicate_avoidance_count 
+                    SELECT language, timezone, message_frequency, active, duplicate_avoidance_count, first_name
                     FROM users WHERE user_id = ?
                 """, (user_id,))
                 result = cursor.fetchone()
                 if result:
                     return {
                         'language': result[0],
-                        'timezone': result[1], 
+                        'timezone': result[1],
                         'message_frequency': result[2],
                         'active': result[3],
-                        'duplicate_avoidance_count': result[4] or 5
+                        'duplicate_avoidance_count': result[4] or 5,
+                        'first_name': result[5]
                     }
                 return None
         except Exception as e:
