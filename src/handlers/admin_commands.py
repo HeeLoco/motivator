@@ -269,6 +269,8 @@ This will be sent to ALL users. Continue?
 
         users_text = f"👥 *All Registered Users* ({len(users_info)})\n"
 
+        ai_usage_by_user = self.db.get_ai_usage_by_user(30)
+
         for i, user in enumerate(users_info, 1):
             user_id_str = user['user_id']
             username = user['username'] or "No username"
@@ -278,11 +280,19 @@ This will be sent to ALL users. Continue?
             active = "✅" if user['active'] else "⏸️"
             last_active = user['last_active'][:10] if user['last_active'] else "Never"
 
+            usage = ai_usage_by_user.get(user['user_id'])
+            if usage:
+                ai_line = (f"🤖 {usage['requests']} req | "
+                           f"{usage['input_tokens']:,} in / {usage['output_tokens']:,} out (30d)")
+            else:
+                ai_line = "🤖 no AI usage (30d)"
+
             users_text += f"""
 *{i}.* `{user_id_str}`
 📛 {first_name} (@{username})
 🌍 {language} | 📊 {frequency}/day | {active}
 🕒 Last: {last_active}
+{ai_line}
 """
 
             # Telegram has message length limits, break into chunks if needed
