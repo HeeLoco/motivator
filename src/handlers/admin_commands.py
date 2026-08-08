@@ -651,7 +651,8 @@ Are you sure you want to proceed?"""
         # Try AI-generated motivation first, fall back to static content
         ai_text = await ai_motivator.generate_motivation(
             language, mood_score, get_display_name(user_settings),
-            self.db.get_user_facts(user_id), user_id=user_id
+            self.db.get_user_facts(user_id), user_id=user_id,
+            recent_messages=self.db.get_recent_ai_texts(user_id)
         )
         if ai_text:
             try:
@@ -659,7 +660,8 @@ Are you sure you want to proceed?"""
                     chat_id=user_id,
                     text=ai_text
                 )
-                self.db.log_sent_message(user_id, message.message_id, 'ai_text')
+                self.db.log_sent_message(user_id, message.message_id, 'ai_text',
+                                         content_text=ai_text)
                 return
             except Exception as e:
                 logger.error(f"Error sending AI motivation to user {user_id}: {e}")

@@ -107,6 +107,8 @@ The bot uses a **modular handler architecture** with clear separation of concern
 - After >20 unsummarized turns, a background task folds the oldest into the summary
   (keeps last 8 verbatim) and refreshes the fact list
 - Facts are injected into ALL AI prompts (chat, /motivateMe, scheduled messages, mood reactions)
+- Anti-repetition: AI-sent texts are stored in sent_messages.content_text; the last 5
+  are fed back into motivation/mood prompts with an instruction to vary focus and wording
 - `/forgetme` deletes chat memory; settings reset also wipes it
 - Daily 3 AM cleanup deletes summarized raw messages older than 30 days (data minimization)
 - Privacy: chat content is sensitive health data - keep it local, never add external logging for it

@@ -133,6 +133,7 @@ def mock_database():
     db.cleanup_old_chat_messages = Mock(return_value=0)
     db.log_ai_usage = Mock(return_value=True)
     db.get_ai_usage_stats = Mock(return_value=[])
+    db.get_recent_ai_texts = Mock(return_value=[])
 
     return db
 

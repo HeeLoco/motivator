@@ -226,6 +226,14 @@ class Database:
             cursor.execute("ALTER TABLE users ADD COLUMN preferred_name TEXT")
             logger.info("Migration: added users.preferred_name")
 
+        # sent_messages.content_text: text of AI-generated messages, fed back
+        # into later prompts so the AI can avoid repeating itself
+        cursor.execute("PRAGMA table_info(sent_messages)")
+        sent_columns = {row[1] for row in cursor.fetchall()}
+        if 'content_text' not in sent_columns:
+            cursor.execute("ALTER TABLE sent_messages ADD COLUMN content_text TEXT")
+            logger.info("Migration: added sent_messages.content_text")
+
         # The goal-management feature was removed; drop its orphaned table
         cursor.execute("DROP TABLE IF EXISTS user_goals")
 
@@ -300,15 +308,16 @@ class Database:
             logger.error(f"Error updating user setting: {e}")
             return False
 
-    def log_sent_message(self, user_id: int, message_id: int, message_type: str, content_id: int = None) -> bool:
-        """Log sent message for tracking"""
+    def log_sent_message(self, user_id: int, message_id: int, message_type: str,
+                         content_id: int = None, content_text: str = None) -> bool:
+        """Log sent message for tracking (content_text only for AI-generated messages)"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO sent_messages (user_id, message_id, message_type, content_id)
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, message_id, message_type, content_id))
+                    INSERT INTO sent_messages (user_id, message_id, message_type, content_id, content_text)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (user_id, message_id, message_type, content_id, content_text))
                 conn.commit()
                 return True
         except Exception as e:
@@ -917,6 +926,22 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting message stats by date: {e}")
             return 0
+
+    def get_recent_ai_texts(self, user_id: int, limit: int = 5) -> List[str]:
+        """Get the texts of the most recent AI messages sent to a user, newest first"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT content_text FROM sent_messages
+                    WHERE user_id = ? AND content_text IS NOT NULL
+                    ORDER BY id DESC
+                    LIMIT ?
+                """, (user_id, limit))
+                return [r[0] for r in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error getting recent AI texts: {e}")
+            return []
 
     def get_last_sent_at(self, user_id: int) -> Optional[str]:
         """Get the timestamp of the user's most recent sent message"""

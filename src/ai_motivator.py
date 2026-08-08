@@ -79,6 +79,25 @@ def _facts_context(language: str, facts: Optional[List[str]]) -> str:
     )
 
 
+def _recent_messages_context(language: str, recent_messages: Optional[List[str]]) -> str:
+    if not recent_messages:
+        return ""
+    lines = "\n".join(f"- {m[:200]}" for m in recent_messages)
+    if language == 'de':
+        return (
+            "Das waren deine letzten Nachrichten an den Nutzer:\n"
+            f"{lines}\n"
+            "Wiederhole weder Formulierungen noch Bilder daraus — wähle bewusst "
+            "einen anderen Fokus, ein anderes Thema und eine andere Wortwahl.\n"
+        )
+    return (
+        "These were your most recent messages to the user:\n"
+        f"{lines}\n"
+        "Do not repeat their wording or imagery - deliberately pick a different "
+        "focus, theme, and phrasing.\n"
+    )
+
+
 def _mood_context(language: str, mood_score: Optional[int]) -> str:
     if mood_score is None:
         return ""
@@ -90,12 +109,14 @@ def _mood_context(language: str, mood_score: Optional[int]) -> str:
 async def generate_motivation(language: str, mood_score: Optional[int] = None,
                               first_name: Optional[str] = None,
                               facts: Optional[List[str]] = None,
-                              user_id: Optional[int] = None) -> Optional[str]:
+                              user_id: Optional[int] = None,
+                              recent_messages: Optional[List[str]] = None) -> Optional[str]:
     """Generate a personalized motivational message."""
     context = (
         f"{_name_context(language, first_name)}"
         f"{_mood_context(language, mood_score)}"
         f"{_facts_context(language, facts)}"
+        f"{_recent_messages_context(language, recent_messages)}"
     )
     if language == 'de':
         prompt = (
@@ -170,12 +191,14 @@ async def generate_chat_reply(language: str, user_message: str,
 async def generate_mood_reaction(language: str, mood_score: int,
                                  first_name: Optional[str] = None,
                                  facts: Optional[List[str]] = None,
-                                 user_id: Optional[int] = None) -> Optional[str]:
+                                 user_id: Optional[int] = None,
+                                 recent_messages: Optional[List[str]] = None) -> Optional[str]:
     """Generate an individual reaction to a fresh mood entry."""
     if language == 'de':
         prompt = (
             f"{_name_context(language, first_name)}"
             f"{_facts_context(language, facts)}"
+            f"{_recent_messages_context(language, recent_messages)}"
             f"Der Nutzer hat gerade seine Stimmung mit {mood_score}/10 erfasst "
             "(1=sehr schlecht, 10=sehr gut). Reagiere individuell darauf: "
             "Bei niedriger Stimmung tröstend und stabilisierend, bei mittlerer "
@@ -185,6 +208,7 @@ async def generate_mood_reaction(language: str, mood_score: int,
         prompt = (
             f"{_name_context(language, first_name)}"
             f"{_facts_context(language, facts)}"
+            f"{_recent_messages_context(language, recent_messages)}"
             f"The user just logged their mood as {mood_score}/10 "
             "(1=very low, 10=very good). React individually: comforting and "
             "grounding for low moods, encouraging for medium, celebrate and "

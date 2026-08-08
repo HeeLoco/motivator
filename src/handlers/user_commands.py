@@ -240,12 +240,14 @@ I'm here to support you! 💙
         ai_text = await ai_motivator.generate_motivation(
             language, mood_score,
             get_display_name(user_settings, update.effective_user.first_name),
-            self.db.get_user_facts(user_id), user_id=user_id
+            self.db.get_user_facts(user_id), user_id=user_id,
+            recent_messages=self.db.get_recent_ai_texts(user_id)
         )
         if ai_text:
             try:
                 message = await update.message.reply_text(ai_text)
-                self.db.log_sent_message(user_id, message.message_id, 'ai_text')
+                self.db.log_sent_message(user_id, message.message_id, 'ai_text',
+                                         content_text=ai_text)
                 await self._send_feedback_buttons(update, language, message.message_id)
                 return
             except Exception as e:

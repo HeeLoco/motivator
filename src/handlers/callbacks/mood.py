@@ -43,11 +43,14 @@ class MoodCallbackHandler:
         ai_reaction = await ai_motivator.generate_mood_reaction(
             language, mood_score,
             get_display_name(user_settings, query.from_user.first_name),
-            self.db.get_user_facts(user_id), user_id=user_id
+            self.db.get_user_facts(user_id), user_id=user_id,
+            recent_messages=self.db.get_recent_ai_texts(user_id)
         )
 
         if ai_reaction:
             response += ai_reaction
+            self.db.log_sent_message(user_id, query.message.message_id, 'ai_text',
+                                     content_text=ai_reaction)
         else:
             content = self.content_manager.get_content_by_mood(mood_score, language)
             if content:
