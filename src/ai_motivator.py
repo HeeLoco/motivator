@@ -98,23 +98,75 @@ def _recent_messages_context(language: str, recent_messages: Optional[List[str]]
     )
 
 
-def _mood_context(language: str, mood_score: Optional[int]) -> str:
+# Mood entries older than this are passed to prompts only as a rough
+# tendency, never as an exact score
+MOOD_SCORE_MAX_AGE_HOURS = 12
+
+
+def _mood_tendency(language: str, mood_score: int) -> str:
+    if mood_score <= 4:
+        return "eher niedrig" if language == 'de' else "rather low"
+    if mood_score <= 6:
+        return "mittelmäßig" if language == 'de' else "moderate"
+    return "gut" if language == 'de' else "good"
+
+
+def _mood_context(language: str, mood_score: Optional[int],
+                  age_hours: Optional[float] = None,
+                  tone_only: bool = False) -> str:
+    """
+    Describe the user's last mood for the prompt.
+
+    age_hours makes the description honest about how old the entry is.
+    Entries older than MOOD_SCORE_MAX_AGE_HOURS are reduced to a rough
+    tendency without the numeric score. tone_only additionally forbids
+    quoting the number verbatim (used for scheduled/instant motivation,
+    where echoing '6/10' hours later feels off).
+    """
     if mood_score is None:
         return ""
+
+    stale = age_hours is not None and age_hours > MOOD_SCORE_MAX_AGE_HOURS
+
     if language == 'de':
-        return f"Die zuletzt erfasste Stimmung des Nutzers ist {mood_score}/10 (1=sehr schlecht, 10=sehr gut). "
-    return f"The user's last logged mood is {mood_score}/10 (1=very low, 10=very good). "
+        if stale:
+            return (
+                f"Die letzte erfasste Stimmung des Nutzers liegt schon etwa "
+                f"{age_hours:.0f} Stunden zurück und war {_mood_tendency(language, mood_score)}. "
+                "Nutze das nur als grobe Orientierung für den Ton und tu nicht so, "
+                "als wäre sie aktuell. "
+            )
+        age_part = f"vor etwa {age_hours:.0f} Stunden erfasst" if age_hours and age_hours >= 1 else "gerade erfasst"
+        text = (f"Die zuletzt erfasste Stimmung des Nutzers ist {mood_score}/10 "
+                f"(1=sehr schlecht, 10=sehr gut; {age_part}). ")
+        if tone_only:
+            text += "Nutze die Stimmung nur für den Ton; zitiere den Zahlenwert nicht wörtlich. "
+        return text
+
+    if stale:
+        return (
+            f"The user's last logged mood is already about {age_hours:.0f} hours old "
+            f"and was {_mood_tendency(language, mood_score)}. Use this only as a rough "
+            "guide for tone and do not act as if it were current. "
+        )
+    age_part = f"logged about {age_hours:.0f} hours ago" if age_hours and age_hours >= 1 else "just logged"
+    text = (f"The user's last logged mood is {mood_score}/10 "
+            f"(1=very low, 10=very good; {age_part}). ")
+    if tone_only:
+        text += "Use the mood only to set the tone; do not quote the number verbatim. "
+    return text
 
 
 async def generate_motivation(language: str, mood_score: Optional[int] = None,
                               first_name: Optional[str] = None,
                               facts: Optional[List[str]] = None,
                               user_id: Optional[int] = None,
-                              recent_messages: Optional[List[str]] = None) -> Optional[str]:
+                              recent_messages: Optional[List[str]] = None,
+                              mood_age_hours: Optional[float] = None) -> Optional[str]:
     """Generate a personalized motivational message."""
     context = (
         f"{_name_context(language, first_name)}"
-        f"{_mood_context(language, mood_score)}"
+        f"{_mood_context(language, mood_score, mood_age_hours, tone_only=True)}"
         f"{_facts_context(language, facts)}"
         f"{_recent_messages_context(language, recent_messages)}"
     )
@@ -136,7 +188,8 @@ async def generate_motivation(language: str, mood_score: Optional[int] = None,
 def _chat_instructions(language: str, mood_score: Optional[int],
                        first_name: Optional[str],
                        facts: Optional[List[str]] = None,
-                       summary: Optional[str] = None) -> str:
+                       summary: Optional[str] = None,
+                       mood_age_hours: Optional[float] = None) -> str:
     """Instructions for conversational replies, including user context."""
     base = _instructions(language)
     if language == 'de':
@@ -159,7 +212,7 @@ def _chat_instructions(language: str, mood_score: Optional[int],
         )
     context = (
         f"{_name_context(language, first_name)}"
-        f"{_mood_context(language, mood_score)}"
+        f"{_mood_context(language, mood_score, mood_age_hours)}"
         f"{_facts_context(language, facts)}"
         f"{summary_part}"
     )
@@ -172,7 +225,8 @@ async def generate_chat_reply(language: str, user_message: str,
                               first_name: Optional[str] = None,
                               facts: Optional[List[str]] = None,
                               summary: Optional[str] = None,
-                              user_id: Optional[int] = None) -> Optional[str]:
+                              user_id: Optional[int] = None,
+                              mood_age_hours: Optional[float] = None) -> Optional[str]:
     """
     Generate an empathetic reply to a free-text message from the user.
 
@@ -182,7 +236,8 @@ async def generate_chat_reply(language: str, user_message: str,
     """
     return await generate_response(
         user_message,
-        instructions=_chat_instructions(language, mood_score, first_name, facts, summary),
+        instructions=_chat_instructions(language, mood_score, first_name, facts,
+                                        summary, mood_age_hours),
         history=history,
         user_id=user_id, use_case='chat',
     )

@@ -15,7 +15,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from .base import BaseHandler
-from .helpers import build_settings_view, get_display_name, get_user_language
+from .helpers import build_settings_view, get_display_name, get_mood_with_age, get_user_language
 from src import ai_motivator
 
 from src.logging_config import get_logger
@@ -232,16 +232,16 @@ I'm here to support you! 💙
         user_settings = self.db.get_user_settings(user_id)
         language = user_settings.get('language', 'de') if user_settings else 'de'
 
-        # Get recent mood to personalize content
-        recent_mood = self.db.get_recent_mood(user_id, 1)
-        mood_score = recent_mood[0]['score'] if recent_mood else 5  # Default to neutral mood
+        # Get recent mood (with age) to personalize content
+        mood_score, mood_age_hours = get_mood_with_age(self.db, user_id)
 
         # Try AI-generated motivation first, fall back to static content
         ai_text = await ai_motivator.generate_motivation(
             language, mood_score,
             get_display_name(user_settings, update.effective_user.first_name),
             self.db.get_user_facts(user_id), user_id=user_id,
-            recent_messages=self.db.get_recent_ai_texts(user_id)
+            recent_messages=self.db.get_recent_ai_texts(user_id),
+            mood_age_hours=mood_age_hours
         )
         if ai_text:
             try:
@@ -254,7 +254,8 @@ I'm here to support you! 💙
                 logger.error(f"Error sending AI motivation to user {user_id}: {e}")
 
         # Get appropriate content based on mood
-        content = self.content_manager.get_content_by_mood(mood_score, language)
+        content = self.content_manager.get_content_by_mood(
+            mood_score if mood_score is not None else 5, language)
 
         if not content:
             # Fallback to random content if mood-based selection fails

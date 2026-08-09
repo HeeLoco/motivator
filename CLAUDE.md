@@ -109,6 +109,9 @@ The bot uses a **modular handler architecture** with clear separation of concern
 - Facts are injected into ALL AI prompts (chat, /motivateMe, scheduled messages, mood reactions)
 - Anti-repetition: AI-sent texts are stored in sent_messages.content_text; the last 5
   are fed back into motivation/mood prompts with an instruction to vary focus and wording
+- Mood context is age-aware: prompts state how old the entry is; motivation prompts never
+  quote the score verbatim (tone only), and entries older than 12h are reduced to a rough
+  tendency (low/moderate/good) without the number
 - `/forgetme` deletes chat memory; settings reset also wipes it
 - Daily 3 AM cleanup deletes summarized raw messages older than 30 days (data minimization)
 - Privacy: chat content is sensitive health data - keep it local, never add external logging for it

@@ -18,7 +18,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from .base import BaseHandler
-from .helpers import get_display_name
+from .helpers import get_display_name, get_mood_with_age
 from ..content import ContentType
 from src import ai_motivator
 
@@ -644,15 +644,15 @@ Are you sure you want to proceed?"""
 
         language = user_settings['language']
 
-        # Get recent mood to personalize content
-        recent_mood = self.db.get_recent_mood(user_id, 1)
-        mood_score = recent_mood[0]['score'] if recent_mood else 5
+        # Get recent mood (with age) to personalize content
+        mood_score, mood_age_hours = get_mood_with_age(self.db, user_id)
 
         # Try AI-generated motivation first, fall back to static content
         ai_text = await ai_motivator.generate_motivation(
             language, mood_score, get_display_name(user_settings),
             self.db.get_user_facts(user_id), user_id=user_id,
-            recent_messages=self.db.get_recent_ai_texts(user_id)
+            recent_messages=self.db.get_recent_ai_texts(user_id),
+            mood_age_hours=mood_age_hours
         )
         if ai_text:
             try:
@@ -671,7 +671,8 @@ Are you sure you want to proceed?"""
         recent_content_ids = self.db.get_recent_sent_content_ids(user_id, duplicate_avoidance_count)
 
         # Get appropriate content while avoiding recent duplicates
-        content = self.content_manager.get_content_by_mood(mood_score, language, recent_content_ids)
+        content = self.content_manager.get_content_by_mood(
+            mood_score if mood_score is not None else 5, language, recent_content_ids)
 
         if not content:
             return

@@ -5,11 +5,34 @@ Home of small utilities used by both command handlers and callback
 handlers, so user-facing views and defaults exist exactly once.
 """
 
-from typing import Tuple
+from datetime import datetime, timezone
+from typing import Optional, Tuple
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 DEFAULT_LANGUAGE = 'de'
+
+
+def get_mood_with_age(db, user_id: int, days: int = 1) -> Tuple[Optional[int], Optional[float]]:
+    """
+    Get the user's most recent mood entry with its age in hours.
+
+    Returns (score, age_hours), or (None, None) if there is no entry
+    within the given window. Timestamps come from SQLite in UTC.
+    """
+    recent_mood = db.get_recent_mood(user_id, days)
+    if not recent_mood:
+        return None, None
+
+    entry = recent_mood[0]
+    try:
+        created_at = datetime.fromisoformat(entry['date'])
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        age_hours = max(0.0, (now - created_at).total_seconds() / 3600)
+    except (ValueError, KeyError, TypeError):
+        age_hours = None
+
+    return entry['score'], age_hours
 
 
 def get_user_language(db, user_id: int) -> str:

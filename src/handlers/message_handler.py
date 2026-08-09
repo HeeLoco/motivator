@@ -19,7 +19,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
 
 from .base import BaseHandler
-from .helpers import get_display_name, get_user_language
+from .helpers import get_display_name, get_mood_with_age, get_user_language
 from src import ai_motivator
 
 from src.logging_config import get_logger
@@ -68,8 +68,7 @@ class MessageHandler(BaseHandler):
             user_settings = self.db.get_user_settings(user_id)
             language = user_settings.get('language', 'de') if user_settings else 'de'
 
-            recent_mood = self.db.get_recent_mood(user_id, 1)
-            mood_score = recent_mood[0]['score'] if recent_mood else None
+            mood_score, mood_age_hours = get_mood_with_age(self.db, user_id)
 
             summary = self.db.get_chat_summary(user_id, chat_id)
             facts = self.db.get_user_facts(user_id)
@@ -82,7 +81,7 @@ class MessageHandler(BaseHandler):
             response = await ai_motivator.generate_chat_reply(
                 language, update.message.text, mood_score, history,
                 get_display_name(user_settings, update.effective_user.first_name),
-                facts, summary, user_id=user_id
+                facts, summary, user_id=user_id, mood_age_hours=mood_age_hours
             )
 
             if response:
