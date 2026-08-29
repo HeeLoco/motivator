@@ -1,5 +1,13 @@
 # Motivator Bot 🤖💙
 
+> **Project status: ended (August 2026).** The bot has been shut down, the
+> Telegram bot deleted, and all user data erased. Despite several iterations,
+> the Motivator did not deliver what its author hoped for in day-to-day use.
+> What remains are the learnings: how databases, chat, and AI work in
+> combination, how to handle context and key facts, and where the limitations
+> are. New approaches for special-purpose agents grew out of this project.
+> Thanks to everyone who joined the journey. 💙
+
 A Telegram bot designed to support mental health and motivation through personalized, AI-powered messages and mood tracking. Perfect for individuals dealing with psychological challenges and their support networks.
 
 ## Features
