@@ -6,6 +6,10 @@ Handles mood-related callback queries:
 - Feedback on motivational messages
 """
 
+from src import ai_motivator
+
+
+from ..helpers import get_display_name, get_user_language
 
 class MoodCallbackHandler:
     """Handles mood-related callback queries"""
@@ -30,18 +34,29 @@ class MoodCallbackHandler:
         user_settings = self.db.get_user_settings(user_id)
         language = user_settings.get('language', 'de') if user_settings else 'de'
 
-        # Send appropriate response based on mood
-        content = self.content_manager.get_content_by_mood(mood_score, language)
-
         if language == 'de':
             response = f"Danke für dein Feedback! Stimmung: {mood_score}/10 📝\n\n"
         else:
             response = f"Thanks for sharing! Mood logged: {mood_score}/10 📝\n\n"
 
-        if content:
-            response += content.content
-            if content.media_url:
-                response += f"\n\n🔗 {content.media_url}"
+        # Try an individual AI reaction first, fall back to static content
+        ai_reaction = await ai_motivator.generate_mood_reaction(
+            language, mood_score,
+            get_display_name(user_settings, query.from_user.first_name),
+            self.db.get_user_facts(user_id), user_id=user_id,
+            recent_messages=self.db.get_recent_ai_texts(user_id)
+        )
+
+        if ai_reaction:
+            response += ai_reaction
+            self.db.log_sent_message(user_id, query.message.message_id, 'ai_text',
+                                     content_text=ai_reaction)
+        else:
+            content = self.content_manager.get_content_by_mood(mood_score, language)
+            if content:
+                response += content.content
+                if content.media_url:
+                    response += f"\n\n🔗 {content.media_url}"
 
         await query.edit_message_text(response)
 
@@ -64,8 +79,7 @@ class MoodCallbackHandler:
         # Log feedback
         self.db.add_feedback(user_id, message_id, 'instant_feedback', feedback_value)
 
-        user_settings = self.db.get_user_settings(user_id)
-        language = user_settings.get('language', 'de') if user_settings else 'de'
+        language = get_user_language(self.db, user_id)
 
         # Send thank you message
         if language == 'de':

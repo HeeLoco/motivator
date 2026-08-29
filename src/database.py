@@ -1,11 +1,15 @@
+import os
 import sqlite3
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-import logging
+
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class Database:
-    def __init__(self, db_path: str = "motivator.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or os.getenv('DB_PATH', 'motivator.db')
         self.init_database()
 
     def init_database(self):
@@ -23,6 +27,8 @@ class Database:
                     timezone TEXT DEFAULT 'UTC',
                     message_frequency INTEGER DEFAULT 2,
                     active BOOLEAN DEFAULT 1,
+                    duplicate_avoidance_count INTEGER DEFAULT 5,
+                    preferred_name TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -135,8 +141,101 @@ class Database:
                 ON motivational_content(active)
             """)
 
+            # AI chat history (raw conversation turns)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    chat_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    summarized BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_user
+                ON chat_messages(user_id, chat_id, summarized)
+            """)
+
+            # Rolling AI conversation summary per user+chat
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS chat_summaries (
+                    user_id INTEGER NOT NULL,
+                    chat_id INTEGER NOT NULL,
+                    summary TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, chat_id)
+                )
+            """)
+
+            # Long-term user facts extracted by the AI
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    fact TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            """)
+
+            # AI token usage accounting per request
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ai_usage (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    use_case TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ai_usage_created
+                ON ai_usage(created_at)
+            """)
+
+            self._run_migrations(cursor)
+
             conn.commit()
-            logging.info("Database initialized successfully")
+            logger.info("Database initialized successfully")
+
+    def _run_migrations(self, cursor):
+        """
+        Idempotent schema migrations for databases created by older versions.
+
+        CREATE TABLE IF NOT EXISTS does not alter existing tables, so columns
+        added to the DDL later must also be back-ported here.
+        """
+        # users.duplicate_avoidance_count was added after initial release
+        cursor.execute("PRAGMA table_info(users)")
+        user_columns = {row[1] for row in cursor.fetchall()}
+        if 'duplicate_avoidance_count' not in user_columns:
+            cursor.execute(
+                "ALTER TABLE users ADD COLUMN duplicate_avoidance_count INTEGER DEFAULT 5"
+            )
+            logger.info("Migration: added users.duplicate_avoidance_count")
+
+        # users.preferred_name: how the bot should address the user
+        # (NULL = use Telegram first name, '' = no name at all)
+        if 'preferred_name' not in user_columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN preferred_name TEXT")
+            logger.info("Migration: added users.preferred_name")
+
+        # sent_messages.content_text: text of AI-generated messages, fed back
+        # into later prompts so the AI can avoid repeating itself
+        cursor.execute("PRAGMA table_info(sent_messages)")
+        sent_columns = {row[1] for row in cursor.fetchall()}
+        if 'content_text' not in sent_columns:
+            cursor.execute("ALTER TABLE sent_messages ADD COLUMN content_text TEXT")
+            logger.info("Migration: added sent_messages.content_text")
+
+        # The goal-management feature was removed; drop its orphaned table
+        cursor.execute("DROP TABLE IF EXISTS user_goals")
 
     def add_user(self, user_id: int, username: str = None, first_name: str = None) -> bool:
         """Add or update user in database"""
@@ -166,7 +265,7 @@ class Database:
                 conn.commit()
                 return True
         except Exception as e:
-            logging.error(f"Error adding user: {e}")
+            logger.error(f"Error adding user: {e}")
             return False
 
     def get_user_settings(self, user_id: int) -> Optional[Dict[str, Any]]:
@@ -175,21 +274,23 @@ class Database:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT language, timezone, message_frequency, active, duplicate_avoidance_count 
+                    SELECT language, timezone, message_frequency, active, duplicate_avoidance_count, first_name, preferred_name
                     FROM users WHERE user_id = ?
                 """, (user_id,))
                 result = cursor.fetchone()
                 if result:
                     return {
                         'language': result[0],
-                        'timezone': result[1], 
+                        'timezone': result[1],
                         'message_frequency': result[2],
                         'active': result[3],
-                        'duplicate_avoidance_count': result[4] or 5
+                        'duplicate_avoidance_count': result[4] or 5,
+                        'first_name': result[5],
+                        'preferred_name': result[6]
                     }
                 return None
         except Exception as e:
-            logging.error(f"Error getting user settings: {e}")
+            logger.error(f"Error getting user settings: {e}")
             return None
 
     def update_user_setting(self, user_id: int, setting: str, value: Any) -> bool:
@@ -204,22 +305,23 @@ class Database:
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:
-            logging.error(f"Error updating user setting: {e}")
+            logger.error(f"Error updating user setting: {e}")
             return False
 
-    def log_sent_message(self, user_id: int, message_id: int, message_type: str, content_id: int = None) -> bool:
-        """Log sent message for tracking"""
+    def log_sent_message(self, user_id: int, message_id: int, message_type: str,
+                         content_id: int = None, content_text: str = None) -> bool:
+        """Log sent message for tracking (content_text only for AI-generated messages)"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO sent_messages (user_id, message_id, message_type, content_id)
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, message_id, message_type, content_id))
+                    INSERT INTO sent_messages (user_id, message_id, message_type, content_id, content_text)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (user_id, message_id, message_type, content_id, content_text))
                 conn.commit()
                 return True
         except Exception as e:
-            logging.error(f"Error logging sent message: {e}")
+            logger.error(f"Error logging sent message: {e}")
             return False
 
     def add_feedback(self, user_id: int, message_id: int, feedback_type: str, feedback_value: str) -> bool:
@@ -234,7 +336,7 @@ class Database:
                 conn.commit()
                 return True
         except Exception as e:
-            logging.error(f"Error adding feedback: {e}")
+            logger.error(f"Error adding feedback: {e}")
             return False
 
     def add_mood_entry(self, user_id: int, mood_score: int, mood_note: str = None) -> bool:
@@ -249,7 +351,7 @@ class Database:
                 conn.commit()
                 return True
         except Exception as e:
-            logging.error(f"Error adding mood entry: {e}")
+            logger.error(f"Error adding mood entry: {e}")
             return False
 
     def get_recent_mood(self, user_id: int, days: int = 7) -> List[Dict]:
@@ -266,7 +368,7 @@ class Database:
                 results = cursor.fetchall()
                 return [{'score': r[0], 'note': r[1], 'date': r[2]} for r in results]
         except Exception as e:
-            logging.error(f"Error getting recent mood: {e}")
+            logger.error(f"Error getting recent mood: {e}")
             return []
 
     def get_recent_sent_content_ids(self, user_id: int, limit: int = 5) -> List[int]:
@@ -283,7 +385,7 @@ class Database:
                 """, (user_id, limit))
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
-            logging.error(f"Error getting recent sent content IDs: {e}")
+            logger.error(f"Error getting recent sent content IDs: {e}")
             return []
 
     def get_active_users(self) -> List[int]:
@@ -294,7 +396,7 @@ class Database:
                 cursor.execute("SELECT user_id FROM users WHERE active = 1")
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
-            logging.error(f"Error getting active users: {e}")
+            logger.error(f"Error getting active users: {e}")
             return []
 
     def get_message_stats(self, user_id: int = None) -> Dict[str, int]:
@@ -317,7 +419,7 @@ class Database:
                     """)
                 return dict(cursor.fetchall())
         except Exception as e:
-            logging.error(f"Error getting message stats: {e}")
+            logger.error(f"Error getting message stats: {e}")
             return {}
 
     def reset_user_data(self, user_id: int) -> bool:
@@ -344,14 +446,247 @@ class Database:
                 
                 # Delete all user's sent message history
                 cursor.execute("DELETE FROM sent_messages WHERE user_id = ?", (user_id,))
-                
+
+                # Delete AI chat memory (history, summary, facts) and usage accounting
+                cursor.execute("DELETE FROM chat_messages WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM chat_summaries WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM user_facts WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM ai_usage WHERE user_id = ?", (user_id,))
+
                 conn.commit()
-                logging.info(f"Reset all data for user {user_id}")
+                logger.info(f"Reset all data for user {user_id}")
                 return True
                 
         except Exception as e:
-            logging.error(f"Error resetting user data: {e}")
+            logger.error(f"Error resetting user data: {e}")
             return False
+
+    # --- AI chat memory (history, rolling summary, user facts) ---
+
+    def add_chat_message(self, user_id: int, chat_id: int, role: str, content: str) -> bool:
+        """Store one conversation turn ('user' or 'assistant')"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO chat_messages (user_id, chat_id, role, content)
+                    VALUES (?, ?, ?, ?)
+                """, (user_id, chat_id, role, content))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error adding chat message: {e}")
+            return False
+
+    def get_unsummarized_messages(self, user_id: int, chat_id: int) -> List[Dict]:
+        """Get all not-yet-summarized turns, oldest first"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, role, content FROM chat_messages
+                    WHERE user_id = ? AND chat_id = ? AND summarized = 0
+                    ORDER BY id ASC
+                """, (user_id, chat_id))
+                return [{'id': r[0], 'role': r[1], 'content': r[2]}
+                        for r in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error getting chat messages: {e}")
+            return []
+
+    def mark_messages_summarized(self, message_ids: List[int]) -> bool:
+        """Flag turns as folded into the rolling summary"""
+        if not message_ids:
+            return True
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                placeholders = ','.join('?' * len(message_ids))
+                cursor.execute(
+                    f"UPDATE chat_messages SET summarized = 1 WHERE id IN ({placeholders})",
+                    message_ids
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error marking messages summarized: {e}")
+            return False
+
+    def get_chat_summary(self, user_id: int, chat_id: int) -> Optional[str]:
+        """Get the rolling conversation summary, if any"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT summary FROM chat_summaries
+                    WHERE user_id = ? AND chat_id = ?
+                """, (user_id, chat_id))
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            logger.error(f"Error getting chat summary: {e}")
+            return None
+
+    def save_chat_summary(self, user_id: int, chat_id: int, summary: str) -> bool:
+        """Insert or replace the rolling conversation summary"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO chat_summaries (user_id, chat_id, summary, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(user_id, chat_id)
+                    DO UPDATE SET summary = excluded.summary, updated_at = excluded.updated_at
+                """, (user_id, chat_id, summary, datetime.now()))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error saving chat summary: {e}")
+            return False
+
+    def get_user_facts(self, user_id: int) -> List[str]:
+        """Get long-term facts the AI has learned about the user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT fact FROM user_facts
+                    WHERE user_id = ? ORDER BY id ASC
+                """, (user_id,))
+                return [r[0] for r in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error getting user facts: {e}")
+            return []
+
+    def replace_user_facts(self, user_id: int, facts: List[str]) -> bool:
+        """Replace the user's fact list with an updated version"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM user_facts WHERE user_id = ?", (user_id,))
+                cursor.executemany(
+                    "INSERT INTO user_facts (user_id, fact) VALUES (?, ?)",
+                    [(user_id, fact) for fact in facts]
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error replacing user facts: {e}")
+            return False
+
+    def delete_chat_memory(self, user_id: int) -> bool:
+        """Delete all AI chat memory for a user (history, summaries, facts)"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM chat_messages WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM chat_summaries WHERE user_id = ?", (user_id,))
+                cursor.execute("DELETE FROM user_facts WHERE user_id = ?", (user_id,))
+                conn.commit()
+                logger.info(f"Deleted chat memory for user {user_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error deleting chat memory: {e}")
+            return False
+
+    def log_ai_usage(self, user_id: Optional[int], use_case: str,
+                     input_tokens: int, output_tokens: int) -> bool:
+        """Record token usage of one AI request"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO ai_usage (user_id, use_case, input_tokens, output_tokens)
+                    VALUES (?, ?, ?, ?)
+                """, (user_id, use_case, input_tokens, output_tokens))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error logging AI usage: {e}")
+            return False
+
+    def get_ai_usage_stats(self, days: int = 30) -> List[Dict]:
+        """Aggregate AI token usage of the last N days, grouped by use case"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT use_case, COUNT(*), SUM(input_tokens), SUM(output_tokens)
+                    FROM ai_usage
+                    WHERE created_at >= datetime('now', ?)
+                    GROUP BY use_case
+                    ORDER BY SUM(input_tokens) + SUM(output_tokens) DESC
+                """, (f'-{days} days',))
+                return [{
+                    'use_case': r[0],
+                    'requests': r[1],
+                    'input_tokens': r[2] or 0,
+                    'output_tokens': r[3] or 0
+                } for r in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error getting AI usage stats: {e}")
+            return []
+
+    def get_user_ai_usage(self, user_id: int, days: int = 30) -> List[Dict]:
+        """Aggregate one user's AI token usage of the last N days by use case"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT use_case, COUNT(*), SUM(input_tokens), SUM(output_tokens)
+                    FROM ai_usage
+                    WHERE user_id = ? AND created_at >= datetime('now', ?)
+                    GROUP BY use_case
+                    ORDER BY SUM(input_tokens) + SUM(output_tokens) DESC
+                """, (user_id, f'-{days} days'))
+                return [{
+                    'use_case': r[0],
+                    'requests': r[1],
+                    'input_tokens': r[2] or 0,
+                    'output_tokens': r[3] or 0
+                } for r in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error getting user AI usage: {e}")
+            return []
+
+    def get_ai_usage_by_user(self, days: int = 30) -> Dict[int, Dict]:
+        """Aggregate AI token usage of the last N days per user"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT user_id, COUNT(*), SUM(input_tokens), SUM(output_tokens)
+                    FROM ai_usage
+                    WHERE created_at >= datetime('now', ?)
+                    GROUP BY user_id
+                """, (f'-{days} days',))
+                return {r[0]: {
+                    'requests': r[1],
+                    'input_tokens': r[2] or 0,
+                    'output_tokens': r[3] or 0
+                } for r in cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"Error getting AI usage by user: {e}")
+            return {}
+
+    def cleanup_old_chat_messages(self, days: int = 30) -> int:
+        """Delete summarized raw chat messages older than N days (data minimization)"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    DELETE FROM chat_messages
+                    WHERE summarized = 1
+                    AND created_at < datetime('now', ?)
+                """, (f'-{days} days',))
+                deleted = cursor.rowcount
+                conn.commit()
+                if deleted:
+                    logger.info(f"Cleaned up {deleted} old chat messages")
+                return deleted
+        except Exception as e:
+            logger.error(f"Error cleaning up chat messages: {e}")
+            return 0
 
     def get_all_users(self) -> List[int]:
         """Get list of all user IDs (active and inactive)"""
@@ -361,7 +696,7 @@ class Database:
                 cursor.execute("SELECT user_id FROM users")
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
-            logging.error(f"Error getting all users: {e}")
+            logger.error(f"Error getting all users: {e}")
             return []
 
     def get_total_mood_entries(self) -> int:
@@ -373,7 +708,7 @@ class Database:
                 result = cursor.fetchone()
                 return result[0] if result else 0
         except Exception as e:
-            logging.error(f"Error getting total mood entries: {e}")
+            logger.error(f"Error getting total mood entries: {e}")
             return 0
 
     def get_recently_active_users(self, days: int = 7) -> List[int]:
@@ -387,7 +722,7 @@ class Database:
                 """.format(days))
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
-            logging.error(f"Error getting recently active users: {e}")
+            logger.error(f"Error getting recently active users: {e}")
             return []
 
     def get_all_users_detailed(self) -> List[Dict[str, Any]]:
@@ -419,7 +754,7 @@ class Database:
                 return users
                 
         except Exception as e:
-            logging.error(f"Error getting detailed user list: {e}")
+            logger.error(f"Error getting detailed user list: {e}")
             return []
 
     def get_user_detailed_info(self, user_id: int) -> Optional[Dict[str, Any]]:
@@ -450,7 +785,7 @@ class Database:
                 return None
                 
         except Exception as e:
-            logging.error(f"Error getting detailed user info: {e}")
+            logger.error(f"Error getting detailed user info: {e}")
             return None
 
     def get_user_timing_preferences(self, user_id: int) -> Optional[Dict[str, Any]]:
@@ -491,7 +826,7 @@ class Database:
                     return self._create_default_timing_preferences(user_id)
                 
         except Exception as e:
-            logging.error(f"Error getting timing preferences: {e}")
+            logger.error(f"Error getting timing preferences: {e}")
             return None
 
     def _create_default_timing_preferences(self, user_id: int) -> Dict[str, Any]:
@@ -525,7 +860,7 @@ class Database:
             }
             
         except Exception as e:
-            logging.error(f"Error creating default timing preferences: {e}")
+            logger.error(f"Error creating default timing preferences: {e}")
             return None
 
     def update_timing_preference(self, user_id: int, setting: str, value: Any) -> bool:
@@ -551,7 +886,7 @@ class Database:
                 return cursor.rowcount > 0
                 
         except Exception as e:
-            logging.error(f"Error updating timing preference: {e}")
+            logger.error(f"Error updating timing preference: {e}")
             return False
 
     def log_message_engagement(self, user_id: int, scheduled_time: str, actual_send_time: str, 
@@ -572,34 +907,9 @@ class Database:
                 return True
                 
         except Exception as e:
-            logging.error(f"Error logging message engagement: {e}")
+            logger.error(f"Error logging message engagement: {e}")
             return False
 
-    def get_user_engagement_patterns(self, user_id: int, days: int = 30) -> List[Dict[str, Any]]:
-        """Get user's engagement patterns for the last N days"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT scheduled_time, actual_send_time, engagement_score, 
-                           response_time_minutes, created_at
-                    FROM message_schedule_log 
-                    WHERE user_id = ? AND created_at >= datetime('now', '-{} days')
-                    ORDER BY created_at DESC
-                """.format(days), (user_id,))
-                
-                results = cursor.fetchall()
-                return [{
-                    'scheduled_time': r[0],
-                    'actual_send_time': r[1], 
-                    'engagement_score': r[2],
-                    'response_time_minutes': r[3],
-                    'created_at': r[4]
-                } for r in results]
-                
-        except Exception as e:
-            logging.error(f"Error getting engagement patterns: {e}")
-            return []
 
     def get_message_stats_by_date(self, user_id: int, date: str) -> int:
         """Get count of messages sent to user on specific date"""
@@ -614,33 +924,41 @@ class Database:
                 return result[0] if result else 0
                 
         except Exception as e:
-            logging.error(f"Error getting message stats by date: {e}")
+            logger.error(f"Error getting message stats by date: {e}")
             return 0
 
-    def get_message_stats_detailed(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get detailed message statistics for user"""
+    def get_recent_ai_texts(self, user_id: int, limit: int = 5) -> List[str]:
+        """Get the texts of the most recent AI messages sent to a user, newest first"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT message_type, content_preview, sent_at, feedback
-                    FROM sent_messages 
-                    WHERE user_id = ? 
-                    ORDER BY sent_at DESC 
+                    SELECT content_text FROM sent_messages
+                    WHERE user_id = ? AND content_text IS NOT NULL
+                    ORDER BY id DESC
                     LIMIT ?
                 """, (user_id, limit))
-                
-                results = cursor.fetchall()
-                return [{
-                    'message_type': r[0],
-                    'content_preview': r[1],
-                    'sent_at': r[2],
-                    'feedback': r[3]
-                } for r in results]
-                
+                return [r[0] for r in cursor.fetchall()]
         except Exception as e:
-            logging.error(f"Error getting detailed message stats: {e}")
+            logger.error(f"Error getting recent AI texts: {e}")
             return []
+
+    def get_last_sent_at(self, user_id: int) -> Optional[str]:
+        """Get the timestamp of the user's most recent sent message"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT sent_at FROM sent_messages
+                    WHERE user_id = ?
+                    ORDER BY sent_at DESC
+                    LIMIT 1
+                """, (user_id,))
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            logger.error(f"Error getting last sent time: {e}")
+            return None
 
     # ==================== Content Management Methods ====================
 
@@ -656,10 +974,10 @@ class Database:
                     VALUES (?, ?, ?, ?, ?, ?, 1)
                 """, (content, content_type, language, category, media_url, tags))
                 conn.commit()
-                logging.info(f"Added content: {content[:50]}... (ID: {cursor.lastrowid})")
+                logger.info(f"Added content: {content[:50]}... (ID: {cursor.lastrowid})")
                 return cursor.lastrowid
         except Exception as e:
-            logging.error(f"Error adding content: {e}")
+            logger.error(f"Error adding content: {e}")
             return None
 
     def get_all_content(self, language: str = None, category: str = None,
@@ -700,79 +1018,10 @@ class Database:
                 } for r in results]
 
         except Exception as e:
-            logging.error(f"Error getting content: {e}")
+            logger.error(f"Error getting content: {e}")
             return []
 
-    def get_content_by_criteria(self, language: str, category: str = None) -> List[Dict[str, Any]]:
-        """Get content matching specific criteria (used by ContentManager)"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
 
-                if category:
-                    cursor.execute("""
-                        SELECT id, content, content_type, language, category, media_url, tags
-                        FROM motivational_content
-                        WHERE language = ? AND category = ? AND active = 1
-                        ORDER BY RANDOM()
-                    """, (language, category))
-                else:
-                    cursor.execute("""
-                        SELECT id, content, content_type, language, category, media_url, tags
-                        FROM motivational_content
-                        WHERE language = ? AND active = 1
-                        ORDER BY RANDOM()
-                    """, (language,))
-
-                results = cursor.fetchall()
-
-                return [{
-                    'id': r[0],
-                    'content': r[1],
-                    'content_type': r[2],
-                    'language': r[3],
-                    'category': r[4],
-                    'media_url': r[5],
-                    'tags': r[6]
-                } for r in results]
-
-        except Exception as e:
-            logging.error(f"Error getting content by criteria: {e}")
-            return []
-
-    def update_content(self, content_id: int, **kwargs) -> bool:
-        """Update existing content"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-
-                allowed_fields = ['content', 'content_type', 'language', 'category',
-                                'media_url', 'tags', 'active']
-                updates = []
-                values = []
-
-                for key, value in kwargs.items():
-                    if key in allowed_fields:
-                        updates.append(f"{key} = ?")
-                        values.append(value)
-
-                if not updates:
-                    return False
-
-                # Add updated_at timestamp
-                updates.append("updated_at = CURRENT_TIMESTAMP")
-                values.append(content_id)
-
-                query = f"UPDATE motivational_content SET {', '.join(updates)} WHERE id = ?"
-                cursor.execute(query, values)
-                conn.commit()
-
-                logging.info(f"Updated content ID {content_id}")
-                return cursor.rowcount > 0
-
-        except Exception as e:
-            logging.error(f"Error updating content: {e}")
-            return False
 
     def delete_content(self, content_id: int) -> bool:
         """Delete content (soft delete by setting active=0)"""
@@ -786,11 +1035,11 @@ class Database:
                 """, (content_id,))
                 conn.commit()
 
-                logging.info(f"Deactivated content ID {content_id}")
+                logger.info(f"Deactivated content ID {content_id}")
                 return cursor.rowcount > 0
 
         except Exception as e:
-            logging.error(f"Error deleting content: {e}")
+            logger.error(f"Error deleting content: {e}")
             return False
 
     def get_content_stats(self) -> Dict[str, Any]:
@@ -838,5 +1087,5 @@ class Database:
                 }
 
         except Exception as e:
-            logging.error(f"Error getting content stats: {e}")
+            logger.error(f"Error getting content stats: {e}")
             return {}

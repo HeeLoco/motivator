@@ -40,12 +40,17 @@ class CallbackRouter:
             'end_time_': self.settings_handler.handle_end_time_select,
             'min_gap_': self.settings_handler.handle_min_gap_select,
             'admin_reset_confirm_': self.admin_handler.handle_admin_reset_confirm,
+            'admin_user_': self.admin_handler.handle_admin_user_detail,
         }
 
         # Exact match handlers
         self.exact_handlers = {
             # Settings
             'set_language': self.settings_handler.handle_set_language,
+            'set_name': self.settings_handler.handle_set_name,
+            'name_enter': self.settings_handler.handle_name_choice,
+            'name_telegram': self.settings_handler.handle_name_choice,
+            'name_none': self.settings_handler.handle_name_choice,
             'set_frequency': self.settings_handler.handle_set_frequency,
             'toggle_active': self.settings_handler.handle_toggle_active,
             'set_timing': self.settings_handler.handle_set_timing,
@@ -60,6 +65,8 @@ class CallbackRouter:
             'confirm_broadcast': self.admin_handler.handle_confirm_broadcast,
             'cancel_broadcast': self.admin_handler.handle_cancel_broadcast,
             'admin_reset_cancel': self.admin_handler.handle_admin_reset_cancel,
+            'admin_users_list': self.admin_handler.handle_admin_users_list,
+            'admin_users_overview': self.admin_handler.handle_admin_users_overview,
 
             # Utility
             'close_menu': self._handle_close_menu,
@@ -78,7 +85,7 @@ class CallbackRouter:
 
         data = query.data
 
-        # Try prefix matching first (more specific patterns like goal_delete_confirm_ before goal_delete_)
+        # Try prefix matching first
         # Sort by length descending to match more specific prefixes first
         for prefix in sorted(self.prefix_handlers.keys(), key=len, reverse=True):
             if data.startswith(prefix):

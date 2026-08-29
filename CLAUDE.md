@@ -47,11 +47,8 @@ python main.py  # Recreates database
 
 ### Testing
 ```bash
-# Test logging system (both JSON and text formats)
-python test_logging.py
-
-# Test module imports
-python test_imports.py
+# Run the test suite (uses mocks, AI calls disabled via conftest autouse fixture)
+pytest
 
 # Manual testing
 # - Test manually by interacting with the bot
@@ -70,9 +67,11 @@ The bot uses a **modular handler architecture** with clear separation of concern
 1. **`main.py`** - Entry point, environment setup, logging initialization
 2. **`bot.py`** - Orchestrator - coordinates handlers and manages application lifecycle
 3. **`logging_config.py`** - Structured logging with JSON/text formatters, correlation IDs, environment-based configuration
-4. **`database.py`** - SQLite operations, user data management, analytics
+4. **`database.py`** - SQLite operations, user data management, analytics, AI chat memory
 5. **`content.py`** - Motivational content management, categorization, multi-language support
 6. **`smart_scheduler.py`** - Intelligent message scheduling with peak-time optimization
+7. **`ai_client.py`** - Generic async OpenAI-compatible client (Azure AI Foundry), returns None on failure
+8. **`ai_motivator.py`** - AI prompt layer: motivation, chat replies, mood reactions, summarization, fact extraction
 
 **Handler Modules** (`src/handlers/`):
 - **`base.py`** - Base handler class with shared utilities
@@ -96,6 +95,26 @@ The bot uses a **modular handler architecture** with clear separation of concern
 - `sent_messages` - Message tracking for analytics
 - `feedback` - User feedback on message effectiveness
 - `mood_entries` - Mood tracking (1-10 scale)
+- `chat_messages` - Raw AI conversation turns (user/assistant), flagged once summarized
+- `chat_summaries` - Rolling AI conversation summary per user+chat
+- `user_facts` - Long-term facts the AI learned about the user (max 15)
+- `ai_usage` - Token accounting per AI request (use case, input/output tokens); shown in /admin_stats
+
+**AI Integration & Conversation Memory**:
+- All AI paths fall back to static ContentManager content when the AI is unavailable
+- Configuration via `AZURE_AI_ENDPOINT`, `AZURE_AI_DEPLOYMENT`, `AZURE_AI_API_KEY` in .env
+- Chat context per reply = rolling summary + user facts + recent verbatim turns
+- After >20 unsummarized turns, a background task folds the oldest into the summary
+  (keeps last 8 verbatim) and refreshes the fact list
+- Facts are injected into ALL AI prompts (chat, /motivateMe, scheduled messages, mood reactions)
+- Anti-repetition: AI-sent texts are stored in sent_messages.content_text; the last 5
+  are fed back into motivation/mood prompts with an instruction to vary focus and wording
+- Mood context is age-aware: prompts state how old the entry is; motivation prompts never
+  quote the score verbatim (tone only), and entries older than 12h are reduced to a rough
+  tendency (low/moderate/good) without the number
+- `/forgetme` deletes chat memory; settings reset also wipes it
+- Daily 3 AM cleanup deletes summarized raw messages older than 30 days (data minimization)
+- Privacy: chat content is sensitive health data - keep it local, never add external logging for it
 
 **Content Management**:
 - Enum-based categorization (MoodCategory: ANXIETY, DEPRESSION, STRESS, MOTIVATION, SELF_CARE, GENERAL)
@@ -170,6 +189,7 @@ new_content = MotivationalContent(
 - `message_frequency` - 1-5 messages per day
 - `timezone` - User timezone (not fully implemented)
 - `active` - Boolean for pause/resume functionality
+- `preferred_name` - How the bot addresses the user (NULL = Telegram first name, '' = no name, else custom name); set via /settings → Anrede
 
 ### Smart Timing Preferences (Database)
 - `active_start_hour/minute` - When daily messages should begin
@@ -234,9 +254,9 @@ docker compose ps
 - File logging disabled by default in containers
 
 **Database Persistence:**
-- Database mounted as volume in docker-compose.yml
+- Database lives in the mounted `./data` directory (`DB_PATH=/data/motivator.db`)
 - Survives container restarts
-- Backup: `cp motivator.db motivator.db.backup`
+- Backup: `cp data/motivator.db data/motivator.db.backup`
 
 **Optional: Log Aggregation with Loki**
 Uncomment the Loki, Promtail, and Grafana sections in docker-compose.yml to enable centralized logging:
